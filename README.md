@@ -30,6 +30,7 @@ projectx/
 ├── heuristics.py               # Peeling chain & rapid sweep risk heuristics
 ├── main.py                     # FastAPI REST API (CORS enabled for port 5174/Vercel)
 ├── serializers.py              # Cytoscape.js element serializers & investigator stats
+├── test_system.py              # Comprehensive 25-case automated test suite (unittest)
 ├── vasp_registry.py            # Verified VASP entity profiles & FIU-IND registry
 │
 └── crypto-tracer-frontend/     # React 18 + TypeScript + Vite + Tailwind CSS + Cytoscape
@@ -56,7 +57,10 @@ projectx/
 
 ```bash
 # Install dependencies
-pip install fastapi uvicorn networkx pydantic
+pip install fastapi uvicorn networkx pydantic httpx
+
+# Run comprehensive automated test suite (25 test cases)
+python -m unittest test_system.py -v
 
 # Run the API server
 python main.py
