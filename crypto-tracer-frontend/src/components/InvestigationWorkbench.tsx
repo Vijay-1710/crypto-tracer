@@ -105,6 +105,9 @@ export const InvestigationWorkbench: React.FC = () => {
             'background-color': '#475569',
             'border-width': 2,
             'border-color': '#64748b',
+            'transition-property': 'background-color, border-color, border-width, width, height, opacity',
+            'transition-duration': 0.3,
+            'transition-timing-function': 'ease-out',
           },
         },
         // Unattributed Node: Grey / Subtle Slate
@@ -200,6 +203,9 @@ export const InvestigationWorkbench: React.FC = () => {
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle',
             'text-rotation': 'autorotate',
+            'transition-property': 'line-color, target-arrow-color, width, opacity',
+            'transition-duration': 0.3,
+            'transition-timing-function': 'ease-out',
           },
         },
         // Primary path edges: vibrant cyan/blue
@@ -395,21 +401,39 @@ export const InvestigationWorkbench: React.FC = () => {
 
     if (cyInstanceRef.current) {
       const cy = cyInstanceRef.current;
-      cy.elements().remove();
-      cy.add(data.elements);
+      cy.stop();
 
-      const layoutConfig = getLayoutConfig(activeLayout);
-      cy.layout(layoutConfig).run();
+      // Preserve existing node positions so re-rendered / updated nodes glide smoothly
+      const existingPositions = new Map<string, { x: number; y: number }>();
+      cy.nodes().forEach((n: any) => {
+        existingPositions.set(n.id(), { ...n.position() });
+      });
 
-      // Two-stage fit: quick first-paint + catch animated layout finish
-      const fitGraph = () => {
-        if (cyInstanceRef.current) {
-          cyInstanceRef.current.resize();
-          cyInstanceRef.current.fit(undefined, 35);
-        }
-      };
-      setTimeout(fitGraph, 150);
-      setTimeout(fitGraph, 700);
+      // Batch element swap to prevent visual flicker
+      cy.batch(() => {
+        cy.elements().remove();
+        cy.add(data.elements);
+
+        // Center point fallback for newly introduced nodes
+        const extent = cy.extent();
+        const centerX = (extent.x1 + extent.x2) / 2 || 300;
+        const centerY = (extent.y1 + extent.y2) / 2 || 250;
+
+        cy.nodes().forEach((n: any) => {
+          if (existingPositions.has(n.id())) {
+            n.position(existingPositions.get(n.id())!);
+          } else {
+            n.position({
+              x: centerX + (Math.random() - 0.5) * 120,
+              y: centerY + (Math.random() - 0.5) * 120,
+            });
+          }
+        });
+      });
+
+      // Execute smooth animated layout with simultaneous viewport fitting
+      const layout = cy.layout(getLayoutConfig(activeLayout) as any);
+      layout.run();
 
       // Auto-select root node for sidebar
       const rootNode = data.elements.find(
@@ -439,36 +463,43 @@ export const InvestigationWorkbench: React.FC = () => {
         return {
           name: 'cola',
           animate: true,
-          refresh: 1,
-          maxSimulationTime: 2000,
+          refresh: 2,
+          maxSimulationTime: 1400,
           ungrabifyWhileSimulating: false,
           fit: true,
-          padding: 40,
+          padding: 45,
           nodeSpacing: 55,
           edgeLengthVal: 140,
           randomize: false,
+          convergenceThreshold: 0.01,
         };
       case 'concentric':
         return {
           name: 'concentric',
           fit: true,
-          padding: 40,
+          padding: 45,
           startAngle: (3 / 2) * Math.PI,
           clockwise: true,
           equidistant: false,
-          minNodeSpacing: 35,
+          minNodeSpacing: 45,
           concentric: (node: any) => 10 - (node.data('hop_distance') || 0),
           levelWidth: () => 1,
+          animate: true,
+          animationDuration: 750,
+          animationEasing: 'ease-out-cubic',
         };
       case 'breadthfirst':
       default:
         return {
           name: 'breadthfirst',
           directed: true,
-          padding: 40,
+          padding: 45,
           fit: true,
-          spacingFactor: 1.5,
+          spacingFactor: 1.4,
           avoidOverlap: true,
+          animate: true,
+          animationDuration: 750,
+          animationEasing: 'ease-out-cubic',
           roots: (node: any) => node.data('is_root') || node.data('nodetype') === 'suspect',
         };
     }
@@ -477,24 +508,35 @@ export const InvestigationWorkbench: React.FC = () => {
   const changeLayout = (type: 'breadthfirst' | 'cola' | 'concentric') => {
     setActiveLayout(type);
     if (cyInstanceRef.current) {
-      const layout = cyInstanceRef.current.layout(getLayoutConfig(type));
+      const cy = cyInstanceRef.current;
+      cy.stop();
+      const layout = cy.layout(getLayoutConfig(type) as any);
       layout.run();
-      cyInstanceRef.current.fit(undefined, 35);
     }
   };
 
   const handleZoom = (factor: number) => {
     if (cyInstanceRef.current) {
-      const zoom = cyInstanceRef.current.zoom();
-      cyInstanceRef.current.zoom(zoom * factor);
-      cyInstanceRef.current.center();
+      const cy = cyInstanceRef.current;
+      const targetZoom = Math.max(0.15, Math.min(3.5, cy.zoom() * factor));
+      cy.animate({
+        zoom: targetZoom,
+        center: { eles: cy.elements() },
+        duration: 280,
+        easing: 'ease-out-cubic',
+      });
     }
   };
 
   const handleFit = () => {
     if (cyInstanceRef.current) {
-      cyInstanceRef.current.resize();
-      cyInstanceRef.current.fit(undefined, 35);
+      const cy = cyInstanceRef.current;
+      cy.resize();
+      cy.animate({
+        fit: { eles: cy.elements(), padding: 45 },
+        duration: 400,
+        easing: 'ease-out-cubic',
+      });
     }
   };
 
