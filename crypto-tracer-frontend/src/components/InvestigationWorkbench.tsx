@@ -263,18 +263,27 @@ export const InvestigationWorkbench: React.FC = () => {
     cyInstanceRef.current = cy;
 
     // -----------------------------------------------------------------------
-    // ResizeObserver: call cy.resize() + fit() whenever the container changes
+    // ResizeObserver: call cy.resize() whenever the container changes
     // dimensions (window resize, sidebar toggle, mobile orientation flip, etc.)
+    // Note: Do NOT call cy.fit() here to avoid freezing layout animations.
     // -----------------------------------------------------------------------
     let resizeTimer: ReturnType<typeof setTimeout>;
-    const resizeObserver = new ResizeObserver(() => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (cyInstanceRef.current) {
-          cyInstanceRef.current.resize();
-          cyInstanceRef.current.fit(undefined, 35);
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (Math.abs(width - lastWidth) > 8 || Math.abs(height - lastHeight) > 8) {
+          lastWidth = width;
+          lastHeight = height;
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            if (cyInstanceRef.current) {
+              cyInstanceRef.current.resize();
+            }
+          }, 100);
         }
-      }, 60);
+      }
     });
     if (cyContainerRef.current) {
       resizeObserver.observe(cyContainerRef.current);
@@ -733,31 +742,40 @@ export const InvestigationWorkbench: React.FC = () => {
         </div>
       </header>
 
-      {/* Success Banner */}
-      {successBanner && (
-        <div className="bg-emerald-950/90 border-b border-emerald-800 text-emerald-200 px-4 py-1.5 text-xs flex items-center justify-between z-10 animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{successBanner}</span>
+      {/* Floating Notification Toasts (Overlay - Zero Layout Shift / No Canvas Reflow) */}
+      <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 max-w-lg w-full px-4">
+        {successBanner && (
+          <div className="pointer-events-auto flex items-center justify-between gap-3 bg-emerald-950/95 border border-emerald-500/50 text-emerald-200 px-4 py-2 rounded-lg text-xs shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-medium tracking-wide">{successBanner}</span>
+            </div>
+            <button
+              onClick={() => setSuccessBanner(null)}
+              className="text-emerald-400/80 hover:text-white font-bold ml-2 text-sm transition cursor-pointer p-0.5"
+              title="Dismiss"
+            >
+              ✕
+            </button>
           </div>
-          <button onClick={() => setSuccessBanner(null)} className="text-emerald-400 hover:text-white font-bold ml-4">
-            ✕
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Error Banner */}
-      {errorMsg && (
-        <div className="bg-red-950/90 border-b border-red-800 text-red-200 px-4 py-2 text-xs flex items-center justify-between z-10">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-            <span>{errorMsg}</span>
+        {errorMsg && (
+          <div className="pointer-events-auto flex items-center justify-between gap-3 bg-red-950/95 border border-red-500/50 text-red-200 px-4 py-2 rounded-lg text-xs shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-200">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="font-medium tracking-wide">{errorMsg}</span>
+            </div>
+            <button
+              onClick={() => setErrorMsg(null)}
+              className="text-red-400/80 hover:text-white font-bold ml-2 text-sm transition cursor-pointer p-0.5"
+              title="Dismiss"
+            >
+              ✕
+            </button>
           </div>
-          <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-white font-bold ml-4">
-            ✕
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ========================================================================= */}
       {/* 2. MAIN WORKSPACE CONTAINER (70% GRAPH CANVAS | 30% SIDEBAR) */}
