@@ -256,11 +256,31 @@ export const InvestigationWorkbench: React.FC = () => {
 
     cyInstanceRef.current = cy;
 
+    // -----------------------------------------------------------------------
+    // ResizeObserver: call cy.resize() + fit() whenever the container changes
+    // dimensions (window resize, sidebar toggle, mobile orientation flip, etc.)
+    // -----------------------------------------------------------------------
+    let resizeTimer: ReturnType<typeof setTimeout>;
+    const resizeObserver = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (cyInstanceRef.current) {
+          cyInstanceRef.current.resize();
+          cyInstanceRef.current.fit(undefined, 35);
+        }
+      }, 60);
+    });
+    if (cyContainerRef.current) {
+      resizeObserver.observe(cyContainerRef.current);
+    }
+
     // Check health & trigger initial trace
     checkBackendHealth();
     handleTrace('0x_suspect_theft_initiator');
 
     return () => {
+      clearTimeout(resizeTimer);
+      resizeObserver.disconnect();
       cy.destroy();
       cyInstanceRef.current = null;
     };
@@ -370,13 +390,16 @@ export const InvestigationWorkbench: React.FC = () => {
         const layout = cy.layout(layoutConfig);
         layout.run();
 
-        // Fit and resize to ensure full visibility
-        setTimeout(() => {
+        // Fit and resize to ensure full visibility after layout animation
+        // Two-stage: 150ms for quick first-paint, 600ms for layout animation finish
+        const fitGraph = () => {
           if (cyInstanceRef.current) {
             cyInstanceRef.current.resize();
             cyInstanceRef.current.fit(undefined, 35);
           }
-        }, 100);
+        };
+        setTimeout(fitGraph, 150);
+        setTimeout(fitGraph, 600);
 
         // Select root or suspect node by default
         const rootNode = data.elements.find(
@@ -695,11 +718,11 @@ export const InvestigationWorkbench: React.FC = () => {
       {/* ========================================================================= */}
       {/* 2. MAIN WORKSPACE CONTAINER (70% GRAPH CANVAS | 30% SIDEBAR) */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative min-h-0">
         {/* --------------------------------------------------------------------- */}
         {/* GRAPH CANVAS (70% WIDTH) */}
         {/* --------------------------------------------------------------------- */}
-        <div className="w-full md:w-[70%] h-full relative border-r border-slate-800 bg-[#070b13] overflow-hidden">
+        <div className="cy-graph-panel w-full md:w-[70%] border-r border-slate-800 bg-[#070b13] overflow-hidden">
           {/* Canvas Floating Control Bar */}
           <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-[#0f172a]/90 border border-slate-800 rounded-lg p-1 shadow-lg backdrop-blur">
             <button
@@ -823,7 +846,7 @@ export const InvestigationWorkbench: React.FC = () => {
         {/* --------------------------------------------------------------------- */}
         {/* SIDEBAR — INTELLIGENCE & ATTRIBUTION METRIC CARDS (30% WIDTH) */}
         {/* --------------------------------------------------------------------- */}
-        <aside className="w-full md:w-[30%] h-full flex flex-col bg-[#0b0f19] border-l border-slate-800 overflow-y-auto z-10">
+        <aside className="sidebar-panel w-full md:w-[30%] flex flex-col bg-[#0b0f19] border-l border-slate-800 z-10">
           {/* High-Level Attribution Stats Cards */}
           <div className="p-3.5 border-b border-slate-800 space-y-3 bg-[#0d1322]">
             <div className="flex items-center justify-between">
