@@ -86,20 +86,22 @@ export const InvestigationWorkbench: React.FC = () => {
         {
           selector: 'node',
           style: {
-            label: (ele: any) => {
-              const label = ele.data('label') || ele.data('id');
-              return label.length > 22 ? `${label.slice(0, 10)}...${label.slice(-6)}` : label;
-            },
-            'font-family': 'Inter, sans-serif',
-            'font-size': '11px',
+            label: (ele: any) => ele.data('label') || ele.data('id'),
+            'text-wrap': 'wrap',
+            'text-max-width': '115px',
+            'font-family': 'Inter, system-ui, sans-serif',
+            'font-size': '10.5px',
             'font-weight': 600,
-            color: '#e2e8f0',
+            color: '#f8fafc',
             'text-valign': 'bottom',
-            'text-margin-y': 7,
-            'text-background-color': '#0f172a',
-            'text-background-opacity': 0.85,
-            'text-background-padding': '3px',
+            'text-margin-y': 8,
+            'text-background-color': '#060c18',
+            'text-background-opacity': 0.92,
+            'text-background-padding': '4px',
             'text-background-shape': 'roundrectangle',
+            'text-border-width': 1,
+            'text-border-color': '#334155',
+            'text-border-opacity': 0.8,
             width: 44,
             height: 44,
             'background-color': '#475569',
@@ -192,17 +194,21 @@ export const InvestigationWorkbench: React.FC = () => {
             'arrow-scale': 1.1,
             label: (ele: any) => {
               const amt = ele.data('amount');
-              return amt ? `${amt} ETH` : '';
+              return amt !== undefined && amt !== null ? `${amt} ETH` : '';
             },
             'font-family': 'JetBrains Mono, monospace',
             'font-size': '10px',
             'font-weight': 600,
             color: '#94a3b8',
-            'text-background-color': '#090d16',
-            'text-background-opacity': 0.9,
-            'text-background-padding': '2px',
+            'text-background-color': '#060c18',
+            'text-background-opacity': 0.95,
+            'text-background-padding': '3px',
             'text-background-shape': 'roundrectangle',
+            'text-border-width': 1,
+            'text-border-color': '#1e293b',
+            'text-border-opacity': 0.8,
             'text-rotation': 'autorotate',
+            'text-margin-y': -9,
             'transition-property': 'line-color, target-arrow-color, width, opacity',
             'transition-duration': 0.3,
             'transition-timing-function': 'ease-out',
@@ -212,12 +218,20 @@ export const InvestigationWorkbench: React.FC = () => {
         {
           selector: 'edge[?in_primary_path]',
           style: {
-            width: 4.5,
+            width: 4,
             'line-color': '#06b6d4',
             'target-arrow-color': '#06b6d4',
             'arrow-scale': 1.4,
             color: '#38bdf8',
             'font-size': '10.5px',
+            'text-background-color': '#060c18',
+            'text-background-opacity': 0.98,
+            'text-background-padding': '3px',
+            'text-background-shape': 'roundrectangle',
+            'text-border-width': 1,
+            'text-border-color': '#0284c7',
+            'text-border-opacity': 0.8,
+            'text-margin-y': -9,
             'z-index': 10,
           },
         },
@@ -476,21 +490,22 @@ export const InvestigationWorkbench: React.FC = () => {
           maxSimulationTime: 1400,
           ungrabifyWhileSimulating: false,
           fit: true,
-          padding: 45,
-          nodeSpacing: 55,
-          edgeLengthVal: 140,
+          padding: 60,
+          nodeSpacing: 70,
+          edgeLengthVal: 160,
           randomize: false,
           convergenceThreshold: 0.01,
+          flow: { axis: 'x', minSeparation: 130 },
         };
       case 'concentric':
         return {
           name: 'concentric',
           fit: true,
-          padding: 45,
+          padding: 60,
           startAngle: (3 / 2) * Math.PI,
           clockwise: true,
           equidistant: false,
-          minNodeSpacing: 45,
+          minNodeSpacing: 55,
           concentric: (node: any) => 10 - (node.data('hop_distance') || 0),
           levelWidth: () => 1,
           animate: true,
@@ -502,14 +517,18 @@ export const InvestigationWorkbench: React.FC = () => {
         return {
           name: 'breadthfirst',
           directed: true,
-          padding: 45,
+          padding: 65,
           fit: true,
-          spacingFactor: 1.4,
+          spacingFactor: 1.75,
           avoidOverlap: true,
           animate: true,
           animationDuration: 750,
           animationEasing: 'ease-out-cubic',
           roots: (node: any) => node.data('is_root') || node.data('nodetype') === 'suspect',
+          transform: (_node: any, pos: { x: number; y: number }) => ({
+            x: pos.y * 2.3, // Map level depth to horizontal X-axis (Suspect on Left -> VASP on Right)
+            y: pos.x * 1.15, // Spread parallel branches along vertical Y-axis
+          }),
         };
     }
   };
