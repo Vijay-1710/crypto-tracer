@@ -317,6 +317,7 @@ export const InvestigationWorkbench: React.FC = () => {
   /**
    * Main Money Flow Analysis Handler.
    * Executes trace against backend and updates Cytoscape canvas.
+   * Falls back gracefully to mock intelligence data when backend is offline (Vercel cloud mode).
    */
   const handleTrace = async (overrideAddress?: string) => {
     const addressToQuery = (overrideAddress || walletAddress).trim();
@@ -330,105 +331,106 @@ export const InvestigationWorkbench: React.FC = () => {
     setSuccessBanner(null);
     setSelectedEntity(null);
 
-    console.log(`[Trace] Requesting money flow trace for: ${addressToQuery} (hops: ${maxHops}, chain: ${chain})`);
+    console.log(`[Trace] Requesting money flow trace for: ${addressToQuery}`);
+
+    let data: any = null;
+
+    // ── Step 1: Try live backend → proxy → mock (in order, fast timeout) ──────
+    const payload = {
+      wallet_address: addressToQuery,
+      chain: chain,
+      max_hops: Number(maxHops),
+      min_amount_threshold: 0.01,
+    };
 
     try {
-      // 1. Post request to backend /api/v1/trace
-      let response;
-      const payload = {
-        wallet_address: addressToQuery,
-        chain: chain,
-        max_hops: Number(maxHops),
-        min_amount_threshold: 0.01,
-      };
-
+      const resp = await axios.post(`${BACKEND_URL}/api/v1/trace`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 2500,
+      });
+      data = resp.data;
+      console.log('[Trace] Live backend responded successfully');
+    } catch {
+      console.warn('[Trace] Live backend unavailable, trying proxy...');
       try {
-        response = await axios.post(`${BACKEND_URL}/api/v1/trace`, payload, {
+        const resp2 = await axios.post('/api/v1/trace', payload, {
           headers: { 'Content-Type': 'application/json' },
+          timeout: 2000,
         });
-      } catch (directErr) {
-        console.warn('[Trace] Direct backend URL call failed, trying proxy fallback /api/v1/trace...', directErr);
-        try {
-          response = await axios.post('/api/v1/trace', payload, {
-            headers: { 'Content-Type': 'application/json' },
-          });
-        } catch (proxyErr) {
-          console.warn('[Trace] Proxy call also failed. Activating Vercel/offline mock intelligence fallback...', proxyErr);
-          const fallbackData = MOCK_TRACE_FALLBACK[addressToQuery] || MOCK_TRACE_FALLBACK['0x_suspect_theft_initiator'];
-          response = { data: fallbackData };
-        }
+        data = resp2.data;
+        console.log('[Trace] Proxy responded successfully');
+      } catch {
+        console.warn('[Trace] All network calls failed — activating offline mock intelligence fallback');
+        data = MOCK_TRACE_FALLBACK[addressToQuery] || MOCK_TRACE_FALLBACK['0x_suspect_theft_initiator'];
       }
-
-      console.log('Trace result:', response.data);
-      const data = response.data;
-      setTraceData(data);
-
-      // 2. Fetch legal case dossier data
-      try {
-        const dossierResp = await axios.post(`${BACKEND_URL}/api/v1/dossier/generate`, {
-          wallet_address: addressToQuery,
-          max_hops: Number(maxHops),
-          chain: chain,
-        }).catch(() => axios.post('/api/v1/dossier/generate', {
-          wallet_address: addressToQuery,
-          max_hops: Number(maxHops),
-          chain: chain,
-        }));
-        setDossierData(dossierResp.data);
-      } catch (dErr) {
-        console.warn('[Dossier] Optional dossier pre-fetch warning:', dErr);
-      }
-
-      // 3. Feed elements into Cytoscape: cy.elements().remove() -> cy.add(...) -> cy.layout().run()
-      if (cyInstanceRef.current && data.elements && data.elements.length > 0) {
-        const cy = cyInstanceRef.current;
-        cy.elements().remove();
-        cy.add(data.elements);
-
-        // Run layout
-        const layoutConfig = getLayoutConfig(activeLayout);
-        const layout = cy.layout(layoutConfig);
-        layout.run();
-
-        // Fit and resize to ensure full visibility after layout animation
-        // Two-stage: 150ms for quick first-paint, 600ms for layout animation finish
-        const fitGraph = () => {
-          if (cyInstanceRef.current) {
-            cyInstanceRef.current.resize();
-            cyInstanceRef.current.fit(undefined, 35);
-          }
-        };
-        setTimeout(fitGraph, 150);
-        setTimeout(fitGraph, 600);
-
-        // Select root or suspect node by default
-        const rootNode = data.elements.find(
-          (el: any) => el.data && !el.data.source && (el.data.is_root || el.data.id === addressToQuery)
-        );
-        if (rootNode) {
-          setSelectedEntity({
-            type: 'node',
-            ...rootNode.data,
-            nodetype: rootNode.data.is_root ? 'suspect' : rootNode.data.nodetype,
-          });
-        }
-
-        setSuccessBanner(
-          `Analysis Complete: ${data.elements.filter((e: any) => !e.data.source).length} nodes, ${
-            data.elements.filter((e: any) => e.data.source).length
-          } transfers traced to ${data.attribution_summary?.target_vasp_summary?.name || 'VASP'}`
-        );
-        setTimeout(() => setSuccessBanner(null), 5000);
-      } else {
-        console.warn('[Trace] No graph elements returned in response');
-      }
-    } catch (err: any) {
-      console.error('Trace error:', err);
-      const detail = err.response?.data?.detail || err.message || 'Error communicating with intelligence API';
-      setErrorMsg(detail);
-    } finally {
-      setIsLoading(false);
     }
+
+    // ── Step 2: Fetch dossier (optional — never blocks the graph render) ───────
+    try {
+      const dossierResp = await axios.post(`${BACKEND_URL}/api/v1/dossier/generate`, {
+        wallet_address: addressToQuery,
+        max_hops: Number(maxHops),
+        chain: chain,
+      }, { timeout: 2500 }).catch(() =>
+        axios.post('/api/v1/dossier/generate', {
+          wallet_address: addressToQuery,
+          max_hops: Number(maxHops),
+          chain: chain,
+        }, { timeout: 2000 })
+      );
+      setDossierData(dossierResp.data);
+    } catch {
+      // Dossier is optional — PDF export still works via mock data
+      console.warn('[Dossier] Offline — PDF will use trace data only');
+    }
+
+    setTraceData(data);
+
+    // ── Step 3: Render into Cytoscape canvas ──────────────────────────────────
+    if (!data?.elements?.length) {
+      console.warn('[Trace] No graph elements returned');
+      setIsLoading(false);
+      return;
+    }
+
+    if (cyInstanceRef.current) {
+      const cy = cyInstanceRef.current;
+      cy.elements().remove();
+      cy.add(data.elements);
+
+      const layoutConfig = getLayoutConfig(activeLayout);
+      cy.layout(layoutConfig).run();
+
+      // Two-stage fit: quick first-paint + catch animated layout finish
+      const fitGraph = () => {
+        if (cyInstanceRef.current) {
+          cyInstanceRef.current.resize();
+          cyInstanceRef.current.fit(undefined, 35);
+        }
+      };
+      setTimeout(fitGraph, 150);
+      setTimeout(fitGraph, 700);
+
+      // Auto-select root node for sidebar
+      const rootNode = data.elements.find(
+        (el: any) => el.data && !el.data.source && (el.data.is_root || el.data.id === addressToQuery)
+      );
+      if (rootNode) {
+        setSelectedEntity({
+          type: 'node',
+          ...rootNode.data,
+          nodetype: rootNode.data.is_root ? 'suspect' : rootNode.data.nodetype,
+        });
+      }
+
+      const nodeCount = data.elements.filter((e: any) => !e.data.source).length;
+      const edgeCount = data.elements.filter((e: any) => e.data.source).length;
+      const targetName = data.attribution_summary?.target_vasp_summary?.name || 'VASP';
+      setSuccessBanner(`Analysis Complete: ${nodeCount} nodes, ${edgeCount} transfers traced to ${targetName}`);
+      setTimeout(() => setSuccessBanner(null), 6000);
+    }
+
+    setIsLoading(false);
   };
 
   const getLayoutConfig = (type: 'breadthfirst' | 'cola' | 'concentric') => {
