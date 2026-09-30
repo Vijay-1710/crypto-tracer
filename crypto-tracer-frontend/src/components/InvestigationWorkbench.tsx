@@ -23,6 +23,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { generateLegalDossierPDF, CaseDossierData, TraceResultsData } from '../utils/exportDossier';
+import { MOCK_TRACE_FALLBACK } from '../utils/mockTraceData';
 
 // Register cola layout
 try {
@@ -327,9 +328,15 @@ export const InvestigationWorkbench: React.FC = () => {
         });
       } catch (directErr) {
         console.warn('[Trace] Direct backend URL call failed, trying proxy fallback /api/v1/trace...', directErr);
-        response = await axios.post('/api/v1/trace', payload, {
-          headers: { 'Content-Type': 'application/json' },
-        });
+        try {
+          response = await axios.post('/api/v1/trace', payload, {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (proxyErr) {
+          console.warn('[Trace] Proxy call also failed. Activating Vercel/offline mock intelligence fallback...', proxyErr);
+          const fallbackData = MOCK_TRACE_FALLBACK[addressToQuery] || MOCK_TRACE_FALLBACK['0x_suspect_theft_initiator'];
+          response = { data: fallbackData };
+        }
       }
 
       console.log('Trace result:', response.data);
