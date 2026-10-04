@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { generateLegalDossierPDF, CaseDossierData, TraceResultsData } from '../utils/exportDossier';
 import { MOCK_TRACE_FALLBACK } from '../utils/mockTraceData';
+import { LaunderingTimelinePlayer } from './LaunderingTimelinePlayer';
 
 // Register cola layout
 try {
@@ -70,6 +71,7 @@ export const InvestigationWorkbench: React.FC = () => {
   const [activeLayout, setActiveLayout] = useState<'breadthfirst' | 'cola' | 'concentric'>('breadthfirst');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [isLegendOpen, setIsLegendOpen] = useState<boolean>(true);
 
   const cyContainerRef = useRef<HTMLDivElement>(null);
   const cyInstanceRef = useRef<Core | null>(null);
@@ -261,6 +263,18 @@ export const InvestigationWorkbench: React.FC = () => {
             'line-color': '#f59e0b',
             'target-arrow-color': '#f59e0b',
             color: '#fbbf24',
+          },
+        },
+        // Active timeline transition edge flash
+        {
+          selector: 'edge.timeline-active-flash',
+          style: {
+            width: 6.5,
+            'underlay-color': '#38bdf8',
+            'underlay-padding': 6,
+            'underlay-opacity': 0.75,
+            'line-color': '#38bdf8',
+            'target-arrow-color': '#38bdf8',
           },
         },
       ],
@@ -956,7 +970,7 @@ export const InvestigationWorkbench: React.FC = () => {
         {/* --------------------------------------------------------------------- */}
         {/* GRAPH CANVAS (70% WIDTH) */}
         {/* --------------------------------------------------------------------- */}
-        <div className="cy-graph-panel w-full md:w-[70%] border-r border-slate-800 bg-[#070b13] overflow-hidden">
+        <div className="cy-graph-panel relative w-full md:w-[70%] border-r border-slate-800 bg-[#070b13] overflow-hidden">
           {/* Canvas Floating Control Bar */}
           <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-[#0f172a]/90 border border-slate-800 rounded-lg p-1 shadow-lg backdrop-blur">
             <button
@@ -1022,44 +1036,70 @@ export const InvestigationWorkbench: React.FC = () => {
             </button>
           </div>
 
-          {/* Graph Legend Overlay (Bottom Left) */}
-          <div className="absolute bottom-3 left-3 z-10 bg-[#0f172a]/90 border border-slate-800/80 rounded-lg p-2.5 text-[11px] shadow-lg backdrop-blur pointer-events-auto">
-            <div className="font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Compass className="w-3 h-3 text-sky-400" />
-              <span>Forensic Node Taxonomy</span>
+          {/* Graph Legend Overlay (Bottom Left - Collapsible) */}
+          <div className="absolute bottom-3 left-3 z-10 bg-[#0f172a]/95 border border-slate-800/90 rounded-lg p-2 text-[11px] shadow-lg backdrop-blur pointer-events-auto max-w-[210px]">
+            <div className="font-semibold text-slate-300 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Compass className="w-3 h-3 text-sky-400" />
+                <span>Forensic Taxonomy</span>
+              </div>
+              <button
+                onClick={() => setIsLegendOpen(!isLegendOpen)}
+                className="text-slate-400 hover:text-white transition text-[10px] px-1 py-0.5 rounded hover:bg-slate-800/60 cursor-pointer"
+                title={isLegendOpen ? 'Collapse Legend' : 'Expand Legend'}
+              >
+                {isLegendOpen ? '▼' : '▲'}
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10px]">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-400/40 inline-block" />
-                <span className="text-slate-300">Suspect Origin</span>
+            {isLegendOpen && (
+              <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-mono text-[9.5px] mt-1.5 pt-1.5 border-t border-slate-800/80">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-400/40 inline-block" />
+                  <span className="text-slate-300">Suspect</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-400/40 inline-block" />
+                  <span className="text-slate-300">VASP Vault</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 border border-dashed border-amber-300 inline-block" />
+                  <span className="text-slate-300">Deposit Proxy</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 ring-2 ring-purple-400/40 inline-block" />
+                  <span className="text-slate-300">Mixer</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-500 inline-block" />
+                  <span className="text-slate-400">Mule</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-1 bg-cyan-400 rounded-full inline-block" />
+                  <span className="text-cyan-300 font-semibold">Primary Trail</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-400/40 inline-block" />
-                <span className="text-slate-300">VASP Hot Vault</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-dashed border-amber-300 inline-block" />
-                <span className="text-slate-300">VASP Deposit Proxy</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 ring-2 ring-purple-400/40 inline-block" />
-                <span className="text-slate-300">Sanctioned Mixer</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block" />
-                <span className="text-slate-400">Unattributed Mule</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-4 h-1 bg-cyan-400 rounded-full inline-block" />
-                <span className="text-cyan-300 font-semibold">Primary Theft Trail</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Cytoscape Graph Container Element (Guaranteed non-zero dimensions with absolute inset-0) */}
           <div
             ref={cyContainerRef}
             className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing cyber-grid"
+          />
+
+          {/* Interactive Laundering Timeline Player Floating Bottom Dock */}
+          <LaunderingTimelinePlayer
+            cy={cyInstanceRef.current}
+            traceData={traceData}
+            isLoading={isLoading}
+            onStepChange={(_step, _total, edgeData) => {
+              if (edgeData) {
+                setSelectedEntity({
+                  type: 'edge',
+                  ...edgeData,
+                });
+              }
+            }}
           />
 
           {/* Loading Radar Overlay */}

@@ -44,6 +44,7 @@ export interface CaseDossierData {
 export interface TraceResultsData {
   root_address?: string;
   chain?: string;
+  elements?: any[];
   attribution_summary?: {
     confidence_score_pct?: number;
     confidence_band?: string;
