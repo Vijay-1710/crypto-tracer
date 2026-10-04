@@ -192,6 +192,8 @@ export const InvestigationWorkbench: React.FC = () => {
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'arrow-scale': 1.1,
+            opacity: 0.65,
+            'line-opacity': 0.65,
             label: (ele: any) => {
               const amt = ele.data('amount');
               return amt !== undefined && amt !== null ? `${amt} ETH` : '';
@@ -214,13 +216,21 @@ export const InvestigationWorkbench: React.FC = () => {
             'transition-timing-function': 'ease-out',
           },
         },
-        // Primary path edges: vibrant cyan/blue
+        // Primary path edges: vibrant cyan flow trail with subtle glow aura
         {
           selector: 'edge[?in_primary_path]',
           style: {
-            width: 4,
+            width: 4.5,
             'line-color': '#06b6d4',
             'target-arrow-color': '#06b6d4',
+            'line-style': 'dashed',
+            'line-dash-pattern': [8, 5],
+            'line-dash-offset': 0,
+            opacity: 1,
+            'line-opacity': 1,
+            'underlay-color': '#06b6d4',
+            'underlay-padding': 3,
+            'underlay-opacity': 0.28,
             'arrow-scale': 1.4,
             color: '#38bdf8',
             'font-size': '10.5px',
@@ -315,6 +325,144 @@ export const InvestigationWorkbench: React.FC = () => {
     };
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Continuous Flow Animation for Primary Path Edges ('in_primary_path': true)
+  // Uses requestAnimationFrame to continuously decrement line-dash-offset,
+  // creating a seamless forward flow trail along the cyan directed edges.
+  // Automatically pauses gracefully when loading, unmounting, or on new trace.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (isLoading || !traceData) return;
+
+    let rafId: number;
+    let offset = 0;
+
+    const animateFlow = () => {
+      // Decrement dash offset smoothly (-offset % 24 moves dashes forward along directed edge)
+      offset = (offset + 0.45) % 24;
+      const cy = cyInstanceRef.current;
+      if (cy && !cy.destroyed()) {
+        const primaryEdges = cy.edges('[?in_primary_path]');
+        if (primaryEdges.length > 0) {
+          primaryEdges.style('line-dash-offset', -offset % 24);
+        }
+      }
+      rafId = requestAnimationFrame(animateFlow);
+    };
+
+    rafId = requestAnimationFrame(animateFlow);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [traceData, isLoading]);
+
+  // ---------------------------------------------------------------------------
+  // Soft Breathing / Pulsing Animation for Terminal Green (VASP Vault) & Red (Suspect)
+  // Uses Cytoscape's native .animation() API to smoothly expand and contract nodes.
+  // Pauses gracefully when unmounting, when a new trace starts, or when layout changes.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (isLoading || !traceData) return;
+
+    let isActive = true;
+    let cancelResolver: (() => void) | null = null;
+    const cancelPromise = new Promise<void>((resolve) => {
+      cancelResolver = resolve;
+    });
+
+    // Wait 800ms to let the initial layout entrance animation settle before breathing
+    const settleTimer = setTimeout(async () => {
+      const cy = cyInstanceRef.current;
+      if (!cy || cy.destroyed() || !isActive) return;
+
+      while (isActive) {
+        const suspectNodes = cy.nodes('[nodetype = "suspect"], [?is_root]');
+        const vaspNodes = cy.nodes('[nodetype = "vasp_hot"]');
+
+        if (suspectNodes.length === 0 && vaspNodes.length === 0) {
+          break;
+        }
+
+        // --- Inhale / Expand Phase (Soft outward pulse) ---
+        const expandPromises: Promise<any>[] = [];
+        if (suspectNodes.length > 0) {
+          const suspectAnimIn = (suspectNodes as any).animation({
+            style: {
+              width: 59,
+              height: 59,
+              'border-width': 6,
+            },
+            duration: 1250,
+            easing: 'ease-in-out',
+          });
+          expandPromises.push(Promise.race([suspectAnimIn.play().promise('completed'), cancelPromise]));
+        }
+        if (vaspNodes.length > 0) {
+          const vaspAnimIn = (vaspNodes as any).animation({
+            style: {
+              width: 61,
+              height: 61,
+              'border-width': 6,
+            },
+            duration: 1250,
+            easing: 'ease-in-out',
+          });
+          expandPromises.push(Promise.race([vaspAnimIn.play().promise('completed'), cancelPromise]));
+        }
+
+        await Promise.all(expandPromises);
+        if (!isActive) break;
+
+        // --- Exhale / Contract Phase (Return to resting geometry) ---
+        const contractPromises: Promise<any>[] = [];
+        if (suspectNodes.length > 0) {
+          const suspectAnimOut = (suspectNodes as any).animation({
+            style: {
+              width: 52,
+              height: 52,
+              'border-width': 4,
+            },
+            duration: 1250,
+            easing: 'ease-in-out',
+          });
+          contractPromises.push(Promise.race([suspectAnimOut.play().promise('completed'), cancelPromise]));
+        }
+        if (vaspNodes.length > 0) {
+          const vaspAnimOut = (vaspNodes as any).animation({
+            style: {
+              width: 54,
+              height: 54,
+              'border-width': 4,
+            },
+            duration: 1250,
+            easing: 'ease-in-out',
+          });
+          contractPromises.push(Promise.race([vaspAnimOut.play().promise('completed'), cancelPromise]));
+        }
+
+        await Promise.all(contractPromises);
+        if (!isActive) break;
+      }
+    }, 800);
+
+    return () => {
+      isActive = false;
+      clearTimeout(settleTimer);
+      if (cancelResolver) cancelResolver();
+      const cy = cyInstanceRef.current;
+      if (cy && !cy.destroyed()) {
+        const suspectNodes = cy.nodes('[nodetype = "suspect"], [?is_root]');
+        const vaspNodes = cy.nodes('[nodetype = "vasp_hot"]');
+        suspectNodes.stop();
+        vaspNodes.stop();
+        // Reset to canonical resting sizes
+        suspectNodes.style({ width: 52, height: 52, 'border-width': 4 });
+        vaspNodes.style({ width: 54, height: 54, 'border-width': 4 });
+      }
+    };
+  }, [traceData, isLoading, activeLayout]);
+
   const checkBackendHealth = async () => {
     try {
       const resp = await axios.get(`${BACKEND_URL}/health`, { timeout: 3000 });
@@ -359,6 +507,11 @@ export const InvestigationWorkbench: React.FC = () => {
     setErrorMsg(null);
     setSuccessBanner(null);
     setSelectedEntity(null);
+
+    // Pause / stop any currently executing Cytoscape animations immediately
+    if (cyInstanceRef.current) {
+      cyInstanceRef.current.stop();
+    }
 
     console.log(`[Trace] Requesting money flow trace for: ${addressToQuery}`);
 
