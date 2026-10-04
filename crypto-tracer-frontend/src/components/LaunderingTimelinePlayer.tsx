@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { TraceResultsData } from '../utils/exportDossier';
+import { formatCryptoToINR } from '../utils/currencyUtils';
 
 export interface LaunderingTimelinePlayerProps {
   cy: Core | null;
@@ -416,7 +417,9 @@ export const LaunderingTimelinePlayer: React.FC<LaunderingTimelinePlayerProps> =
                 <span className="text-cyan-400 font-semibold">{activeMilestone.timeStr}</span>
                 <span className="text-slate-500 mx-1.5">—</span>
                 <span className="text-slate-100 font-medium">{activeMilestone.title}</span>
-                <span className="text-emerald-400 font-semibold ml-1.5">({activeMilestone.amount} ETH)</span>
+                <span className="text-emerald-400 font-semibold ml-1.5">
+                  ({activeMilestone.amount} ETH • ≈ {formatCryptoToINR(activeMilestone.amount, 'ETH')})
+                </span>
                 <span className="text-slate-400 ml-2 hidden sm:inline text-[10px]">
                   ({activeMilestone.sourceLabel} → {activeMilestone.targetLabel})
                 </span>

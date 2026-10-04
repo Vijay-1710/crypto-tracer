@@ -25,6 +25,13 @@ import {
 import { generateLegalDossierPDF, CaseDossierData, TraceResultsData } from '../utils/exportDossier';
 import { MOCK_TRACE_FALLBACK } from '../utils/mockTraceData';
 import { LaunderingTimelinePlayer } from './LaunderingTimelinePlayer';
+import {
+  CRYPTO_INR_RATES,
+  LIVE_TICKER_TEXT,
+  formatCryptoToINR,
+  formatCryptoWithINR,
+  formatFullLossINR,
+} from '../utils/currencyUtils';
 
 // Register cola layout
 try {
@@ -198,7 +205,8 @@ export const InvestigationWorkbench: React.FC = () => {
             'line-opacity': 0.65,
             label: (ele: any) => {
               const amt = ele.data('amount');
-              return amt !== undefined && amt !== null ? `${amt} ETH` : '';
+              if (amt === undefined || amt === null) return '';
+              return `${amt} ETH (≈ ${formatCryptoToINR(amt, 'ETH')})`;
             },
             'font-family': 'JetBrains Mono, monospace',
             'font-size': '10px',
@@ -814,6 +822,15 @@ export const InvestigationWorkbench: React.FC = () => {
                   <span className="text-slate-400">CONNECTING...</span>
                 )}
               </span>
+              <span className="inline-block w-1 h-1 rounded-full bg-slate-600 hidden sm:inline" />
+              {/* Discreet Live INR Valuation Ticker Badge */}
+              <div
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] shadow-sm select-none"
+                title="Standard FIU-IND Reference Valuation Rates"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-semibold tracking-tight">{LIVE_TICKER_TEXT}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1181,6 +1198,9 @@ export const InvestigationWorkbench: React.FC = () => {
                 <div>
                   <div className="text-slate-500">Volume Traced</div>
                   <div className="text-amber-300 font-bold">{totalVolume.toFixed(2)} {chain}</div>
+                  <div className="text-emerald-400 font-semibold text-[9.5px]">
+                    ≈ {formatCryptoToINR(totalVolume, chain)}
+                  </div>
                 </div>
                 <div>
                   <div className="text-slate-500">Jurisdiction</div>
@@ -1325,7 +1345,10 @@ export const InvestigationWorkbench: React.FC = () => {
                         <div className="bg-[#090d16] p-2 rounded border border-slate-800">
                           <div className="text-slate-500 text-[10px]">Transfer Amount</div>
                           <div className="text-amber-300 font-bold mt-0.5">
-                            {selectedEntity.amount} ETH
+                            {selectedEntity.amount} {chain}
+                          </div>
+                          <div className="text-emerald-400 font-semibold text-[10.5px]">
+                            ≈ {formatCryptoToINR(selectedEntity.amount || 0, chain)}
                           </div>
                         </div>
                         <div className="bg-[#090d16] p-2 rounded border border-slate-800">
@@ -1361,6 +1384,20 @@ export const InvestigationWorkbench: React.FC = () => {
                           {selectedEntity.hop_distance ?? 0} Hops
                         </div>
                       </div>
+
+                      {/* Wallet Balance with INR conversion */}
+                      {selectedEntity.balance !== undefined && selectedEntity.balance !== null && (
+                        <div className="bg-[#090d16] p-2 rounded border border-slate-800 col-span-2">
+                          <div className="text-slate-500 text-[10px]">Current Wallet Balance</div>
+                          <div className="flex items-baseline gap-2 mt-0.5">
+                            <span className="text-amber-300 font-bold">{selectedEntity.balance} {chain}</span>
+                            <span className="text-emerald-400 font-semibold text-[10.5px]">
+                              (≈ {formatCryptoToINR(selectedEntity.balance, chain)})
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="bg-[#090d16] p-2 rounded border border-slate-800 col-span-2">
                         <div className="text-slate-500 text-[10px]">Compliance Contact</div>
                         <div className="text-slate-300 font-sans text-xs mt-0.5">
@@ -1377,8 +1414,22 @@ export const InvestigationWorkbench: React.FC = () => {
               )}
             </div>
 
-            {/* Bottom Section: Generate Section 91 Requisition Notice Action */}
-            <div className="pt-2 border-t border-slate-800">
+            {/* Bottom Section: Quantified Loss in INR & Statutory Requisition Notice Action */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              {/* Quantified Subject Loss Card */}
+              <div className="bg-[#090e1a] border border-cyan-500/30 rounded-lg p-2.5 font-mono text-[11px] shadow-sm">
+                <div className="text-slate-400 text-[10px] uppercase font-bold flex items-center justify-between">
+                  <span>Quantified Loss Assessment</span>
+                  <span className="text-emerald-400">FIU Reference Rate</span>
+                </div>
+                <div className="text-sm font-bold text-white mt-1">
+                  {formatFullLossINR(totalVolume, chain).combined}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
+                  <span>Standard Rate: 1 {chain} ≈ ₹{CRYPTO_INR_RATES[chain.toUpperCase()]?.toLocaleString('en-IN') || '2,85,420'}</span>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={handleExportPDF}
@@ -1398,7 +1449,7 @@ export const InvestigationWorkbench: React.FC = () => {
                   </>
                 )}
               </button>
-              <div className="text-[10px] text-center text-slate-500 mt-1.5 font-mono">
+              <div className="text-[10px] text-center text-slate-500 font-mono">
                 Produces Statutory Court & Exchange Requisition PDF (Rule 91 CrPC / Sec 94 BNSS)
               </div>
             </div>

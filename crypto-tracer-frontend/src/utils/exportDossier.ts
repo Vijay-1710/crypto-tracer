@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { CRYPTO_INR_RATES, formatCryptoToINR, formatFullLossINR } from './currencyUtils';
 
 export interface ForensicHop {
   step_number: number;
@@ -165,6 +166,8 @@ export function generateLegalDossierPDF(
     traceResults?.metrics?.total_volume_crypto ||
     95.0;
   const chain = traceResults?.chain || 'ETH';
+  const lossValuation = formatFullLossINR(totalVolume, chain);
+
   const currentDate = new Date().toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -230,7 +233,7 @@ export function generateLegalDossierPDF(
   doc.text('Subject Matter:', margin + 4, y + 13);
   doc.setFont('helvetica', 'normal');
   doc.text(
-    `Statutory Requisition & Asset Freeze for Deposit Account linked to ${rootAddress}`,
+    `Statutory Requisition & Asset Freeze (${totalVolume} ${chain} / ${lossValuation.inrExact}) linked to ${rootAddress}`,
     margin + 30,
     y + 13
   );
@@ -289,7 +292,7 @@ export function generateLegalDossierPDF(
   doc.setTextColor(71, 85, 105);
   doc.setFont('helvetica', 'normal');
   doc.text(
-    `Hop Decay: ${hopDecay}  |  Preserved: ${valuePreserved}  |  Total Traced: ${totalVolume} ${chain}`,
+    `Hop Decay: ${hopDecay}  |  Preserved: ${valuePreserved}  |  Loss: ${totalVolume} ${chain} (≈ ${lossValuation.inrShort})`,
     margin + 105,
     y + 25
   );
@@ -310,7 +313,7 @@ export function generateLegalDossierPDF(
       `#${hop.step_number}`,
       formatTableAddress(hop.from_address),
       formatTableAddress(hop.to_address),
-      `${hop.amount_crypto.toFixed(2)} ${chain}`,
+      `${hop.amount_crypto.toFixed(2)} ${chain}\n(≈ ${formatCryptoToINR(hop.amount_crypto, chain)})`,
       formatTableTxHash(hop.tx_hash),
       hop.step_type || 'Mule / Layering Transfer',
     ]);
@@ -321,11 +324,12 @@ export function generateLegalDossierPDF(
       const to = trail[i + 1];
       const isFirst = i === 0;
       const isLast = i === trail.length - 2;
+      const hopAmt = totalVolume * (1 - i * 0.05);
       tableRows.push([
         `#${i + 1}`,
         formatTableAddress(from),
         formatTableAddress(to),
-        `${(totalVolume * (1 - i * 0.05)).toFixed(2)} ${chain}`,
+        `${hopAmt.toFixed(2)} ${chain}\n(≈ ${formatCryptoToINR(hopAmt, chain)})`,
         `0xtx_hop_audit_${i + 1}`,
         isFirst
           ? 'Initial Theft Dispatch / First Mule Transfer'
@@ -336,10 +340,10 @@ export function generateLegalDossierPDF(
     }
   } else {
     tableRows = [
-      ['#1', '0x_suspect_theft_initiator', '0x_mule_account_alpha', '95.00 ETH', '0xtx_theft_01', 'Initial Theft Dispatch'],
-      ['#2', '0x_mule_account_alpha', '0x_peeling_layer_01', '85.00 ETH', '0xtx_peeling_01', 'Asymmetric Peeling Cut'],
-      ['#3', '0x_peeling_layer_01', '0x_dep_coindcx_user_4492', '80.00 ETH', '0xtx_peeling_dep', 'Deposit Proxy Inflow'],
-      ['#4', '0x_dep_coindcx_user_4492', 'CoinDCX Hot Vault', '79.80 ETH', '0xtx_hot_sweep', 'Internal Consolidation Sweep'],
+      ['#1', '0x_suspect_theft_initiator', '0x_mule_account_alpha', '95.00 ETH\n(≈ ₹2.71 Cr)', '0xtx_theft_01', 'Initial Theft Dispatch'],
+      ['#2', '0x_mule_account_alpha', '0x_peeling_layer_01', '85.00 ETH\n(≈ ₹2.43 Cr)', '0xtx_peeling_01', 'Asymmetric Peeling Cut'],
+      ['#3', '0x_peeling_layer_01', '0x_dep_coindcx_user_4492', '80.00 ETH\n(≈ ₹2.28 Cr)', '0xtx_peeling_dep', 'Deposit Proxy Inflow'],
+      ['#4', '0x_dep_coindcx_user_4492', 'CoinDCX Hot Vault', '79.80 ETH\n(≈ ₹2.27 Cr)', '0xtx_hot_sweep', 'Internal Consolidation Sweep'],
     ];
   }
 
@@ -364,11 +368,11 @@ export function generateLegalDossierPDF(
       fillColor: [248, 250, 252],
     },
     columnStyles: {
-      0: { cellWidth: 12, fontStyle: 'bold', halign: 'center' },
-      1: { cellWidth: 42, font: 'courier' },
-      2: { cellWidth: 42, font: 'courier' },
-      3: { cellWidth: 20, fontStyle: 'bold', halign: 'right' },
-      4: { cellWidth: 24, font: 'courier' },
+      0: { cellWidth: 10, fontStyle: 'bold', halign: 'center' },
+      1: { cellWidth: 40, font: 'courier' },
+      2: { cellWidth: 40, font: 'courier' },
+      3: { cellWidth: 26, fontStyle: 'bold', halign: 'right' },
+      4: { cellWidth: 22, font: 'courier' },
       5: { cellWidth: 'auto' },
     },
     margin: { left: margin, right: margin },
@@ -381,7 +385,7 @@ export function generateLegalDossierPDF(
   // 4. Evidentiary Standard Assessment Card on Page 1
   doc.setFillColor(240, 253, 244); // green-50
   doc.setDrawColor(34, 197, 94); // green-500
-  doc.roundedRect(margin, y, pageWidth - 2 * margin, 24, 2, 2, 'FD');
+  doc.roundedRect(margin, y, pageWidth - 2 * margin, 28, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -392,23 +396,28 @@ export function generateLegalDossierPDF(
   doc.setFontSize(7.5);
   doc.setTextColor(30, 41, 59);
   doc.text(
-    `• Deterministic Attribution Score: ${confidenceScore.toFixed(2)}% (Statutory Requirement: > 65.0% for asset freezing).`,
+    `• Quantified Loss & Valuation: ${lossValuation.combined} based on FIU-IND reference conversion benchmark.`,
     margin + 4,
     y + 11.5
   );
   doc.text(
-    `• Identified Modus Operandi: Rapid multi-hop sweep combined with asymmetric peeling chain to obfuscate stolen cryptocurrency.`,
+    `• Deterministic Attribution Score: ${confidenceScore.toFixed(2)}% (Statutory Requirement: > 65.0% for asset freezing).`,
     margin + 4,
     y + 16
   );
   doc.text(
-    `• Actionable Destination: The target VASP proxy address ${targetDeposit} represents a confirmed digital asset cash-out endpoint.`,
+    `• Identified Modus Operandi: Rapid multi-hop sweep combined with asymmetric peeling chain to obfuscate stolen cryptocurrency.`,
     margin + 4,
     y + 20.5
   );
+  doc.text(
+    `• Actionable Destination: The target VASP proxy address ${targetDeposit} represents a confirmed digital asset cash-out endpoint.`,
+    margin + 4,
+    y + 25
+  );
 
   // Notice continuation indicator
-  y += 30;
+  y += 34;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
@@ -469,8 +478,8 @@ export function generateLegalDossierPDF(
   // Recitals & Statutory Directives
   const statutoryNoticeClauses = [
     `1. PREAMBLE & JURISDICTION: Whereas an investigation into digital asset grand theft, cyber fraud, and money laundering is being conducted under the Indian Penal Code (IPC) / Bharatiya Nyaya Sanhita (BNS), 2023 read with the Prevention of Money Laundering Act (PMLA), 2002.`,
-    `2. FORENSIC ATTRIBUTION FINDING: On-chain ledger telemetry has conclusively established that stolen cryptocurrency originating from root suspect wallet [${rootAddress}] was layered through intermediary accounts and credited into your exchange infrastructure at deposit proxy address [${targetDeposit}] with an attribution confidence of ${confidenceScore.toFixed(2)}%.`,
-    `3. STATUTORY DIRECTIVE FOR IMMEDIATE ACCOUNT FREEZING: Under powers conferred by Section 91 of the Code of Criminal Procedure, 1973 (Cr.P.C.) / Section 94 of Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023, you are hereby ORDERED to immediately FREEZE all wallet balances, spot trading accounts, fiat withdrawal gateways, and collateral accounts associated with or linked to deposit address [${targetDeposit}].`,
+    `2. FORENSIC ATTRIBUTION FINDING: On-chain ledger telemetry has conclusively established that stolen cryptocurrency of ${totalVolume} ${chain} (Quantified Valuation: ${lossValuation.inrExact} / ≈ ${lossValuation.inrShort}) originating from root suspect wallet [${rootAddress}] was layered through intermediary accounts and credited into your exchange infrastructure at deposit proxy address [${targetDeposit}] with an attribution confidence of ${confidenceScore.toFixed(2)}%.`,
+    `3. STATUTORY DIRECTIVE FOR IMMEDIATE ACCOUNT FREEZING: Under powers conferred by Section 91 of the Code of Criminal Procedure, 1973 (Cr.P.C.) / Section 94 of Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023, you are hereby ORDERED to immediately FREEZE all wallet balances, spot trading accounts, fiat withdrawal gateways, and collateral accounts associated with or linked to deposit address [${targetDeposit}] up to the quantified proceeds value of ${lossValuation.inrExact} (${totalVolume} ${chain}).`,
     `4. MANDATORY PRODUCTION OF RECORDS (48-HOUR TIMELINE): You are strictly directed to supply the following documents to the undersigned investigating authority within 48 HOURS of receipt:`,
     `    (a) Full User KYC profile: Verified Aadhaar card, PAN card, photograph, residential address, verified mobile number, and registered email.`,
     `    (b) Complete Financial Ledger: Historical deposits, withdrawals, order book trades, and internal transfer records from account opening to date.`,
