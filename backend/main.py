@@ -361,14 +361,16 @@ async def generate_dossier_endpoint(payload: DossierRequest) -> DossierResponse:
 # Standalone Execution Entrypoint
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import os
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
 
+    port = int(os.environ.get("PORT", 8000))
     print("=" * 80)
     print(" LAUNCHING CRYPTO TRACKING & ATTRIBUTION FASTAPI SERVER")
-    print(" HOST: 0.0.0.0 | PORT: 8000")
+    print(f" HOST: 0.0.0.0 | PORT: {port}")
     print("=" * 80)
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, log_level="info")

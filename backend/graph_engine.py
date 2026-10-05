@@ -247,10 +247,12 @@ class BlockchainGraphTracer:
                     reachable_vasps.append({
                         "vasp_address": node,
                         "label": node_attrs.get("label", node),
+                        "entity_name": node_attrs.get("label", node),
                         "entity_type": node_attrs.get("entity_type", "Centralized Exchange"),
                         "nodetype": nodetype,
                         "risk_tier": node_attrs.get("risk_tier", "Low"),
                         "hop_distance": hop_distance,
+                        "hops": hop_distance,
                         "path": path,
                         "path_str": " -> ".join(path),
                         "total_volume_crypto": round(total_volume, 4),

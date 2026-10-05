@@ -23,30 +23,38 @@ An advanced multi-hop cryptocurrency intelligence and VASP (Virtual Asset Servic
 
 ```
 projectx/
-├── attribution_engine.py       # Deterministic VASP attribution scoring engine
-├── data_ingestor.py            # On-chain ingestion & synthetic laundering ledger
-├── dossier_builder.py          # Section 91 CrPC / Section 94 BNSS brief builder
-├── graph_engine.py             # NetworkX multi-hop BFS path tracing
-├── heuristics.py               # Peeling chain & rapid sweep risk heuristics
-├── main.py                     # FastAPI REST API (CORS enabled for port 5174/Vercel)
-├── serializers.py              # Cytoscape.js element serializers & investigator stats
-├── test_system.py              # Comprehensive 25-case automated test suite (unittest)
-├── vasp_registry.py            # Verified VASP entity profiles & FIU-IND registry
+├── backend/                        # Python FastAPI Intelligence & Attribution Engine
+│   ├── attribution_engine.py       # Deterministic VASP attribution scoring engine
+│   ├── data_ingestor.py            # On-chain ingestion & synthetic laundering ledger
+│   ├── dossier_builder.py          # Section 91 CrPC / Section 94 BNSS brief builder
+│   ├── graph_engine.py             # NetworkX multi-hop BFS path tracing
+│   ├── heuristics.py               # Peeling chain & rapid sweep risk heuristics
+│   ├── main.py                     # FastAPI REST API (CORS enabled for port 5174/Vercel)
+│   ├── serializers.py              # Cytoscape.js element serializers & investigator stats
+│   ├── vasp_registry.py            # Verified VASP entity profiles & FIU-IND registry
+│   ├── test_system.py              # Comprehensive 25-case automated test suite (unittest)
+│   ├── requirements.txt            # Backend dependencies
+│   └── __init__.py                 # Package marker
 │
-└── crypto-tracer-frontend/     # React 18 + TypeScript + Vite + Tailwind CSS + Cytoscape
-    ├── src/
-    │   ├── components/
-    │   │   ├── InvestigationWorkbench.tsx  # Main Forensic Workbench
-    │   │   └── InvestigationWorkbench.jsx  # Re-export wrapper
-    │   ├── utils/
-    │   │   ├── exportDossier.ts            # jsPDF & autoTable Section 91 exporter
-    │   │   └── exportDossier.js            # Wrapper
-    │   ├── App.tsx
-    │   ├── main.tsx
-    │   └── index.css
-    ├── vite.config.ts
-    ├── tailwind.config.js
-    └── package.json
+├── frontend/                       # React 18 + TypeScript + Vite + Tailwind CSS + Cytoscape
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── InvestigationWorkbench.tsx  # Main Forensic Workbench
+│   │   │   ├── InvestigationWorkbench.jsx  # Re-export wrapper
+│   │   │   └── LaunderingTimelinePlayer.tsx # Historical flow scrubber
+│   │   ├── utils/
+│   │   │   ├── exportDossier.ts            # jsPDF & autoTable Section 91 exporter
+│   │   │   ├── exportDossier.js            # Wrapper
+│   │   │   └── mockTraceData.ts            # Demonstration graph fixtures
+│   │   ├── App.tsx
+│   │   ├── main.tsx
+│   │   └── index.css
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   └── package.json
+│
+├── requirements.txt                # Workspace root Python dependencies
+└── README.md                       # Documentation
 ```
 
 ---
@@ -57,9 +65,10 @@ projectx/
 
 ```bash
 # Install dependencies
-pip install fastapi uvicorn networkx pydantic httpx
+pip install -r backend/requirements.txt
 
 # Run comprehensive automated test suite (25 test cases)
+cd backend
 python -m unittest test_system.py -v
 
 # Run the API server
@@ -70,13 +79,16 @@ Backend will start on: **`http://127.0.0.1:8000`** (Swagger docs: `/docs`, Healt
 ### 2. Frontend (Cyber Forensic Workbench)
 
 ```bash
-cd crypto-tracer-frontend
+cd frontend
 
 # Install dependencies
 npm install
 
 # Start development server
 npm run dev
+
+# Build production bundle
+npm run build
 ```
 Frontend will be accessible at: **`http://localhost:5174/`**.
 
@@ -87,7 +99,7 @@ Frontend will be accessible at: **`http://localhost:5174/`**.
 Deploy the frontend directly to Vercel:
 
 ```bash
-cd crypto-tracer-frontend
+cd frontend
 npx vercel
 ```
 Set `VITE_API_URL` environment variable in Vercel to your deployed backend API URL.

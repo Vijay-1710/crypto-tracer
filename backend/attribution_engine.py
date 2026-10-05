@@ -159,6 +159,12 @@ class VASPAttributionScorer:
         if not trail_path or len(trail_path) < 2:
             raise ValueError("A valid trail path with at least 2 nodes is required.")
 
+        # Check if graph was passed as second positional argument
+        if isinstance(path_txs, (nx.Graph, nx.DiGraph)):
+            if graph is None:
+                graph = path_txs
+            path_txs = None
+
         # Reconstruct path_txs from graph if not explicitly provided
         if path_txs is None and graph is not None:
             path_txs = []
