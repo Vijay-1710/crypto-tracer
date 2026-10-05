@@ -161,9 +161,24 @@ export function generateLegalDossierPDF(
   const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
   const margin = 14;                                   // 14mm
   const contentWidth = pageWidth - (margin * 2);        // 182mm
+  let currentY = 16;                                   // Dynamic height tracking cursor
 
-  // Dynamic vertical tracking cursor
-  let currentY = 0;
+  /**
+   * Safe text printing helper with automatic line wrapping and dynamic vertical height tracking.
+   */
+  const printWrapped = (
+    text: string,
+    x: number,
+    maxWidth: number,
+    fontSize: number = 9,
+    isBold: boolean = false
+  ) => {
+    doc.setFontSize(fontSize);
+    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    const lines = doc.splitTextToSize(text, maxWidth);
+    doc.text(lines, x, currentY);
+    currentY += lines.length * (fontSize * 0.45) + 2;
+  };
 
   // Resolve metadata values
   const caseId =
@@ -459,42 +474,34 @@ export function generateLegalDossierPDF(
   currentY = lastTable ? lastTable.finalY + 5 : currentY + 55;
 
   // 4. Evidentiary Standard Assessment Card on Page 1
-  const card3H = 28;
+  const assessmentBullets = [
+    `- Quantified Loss & Valuation: ${totalVolume} ${chain} (${lossValuation.inrExact} / ~ ${lossValuation.inrShort}) via FIU-IND reference conversion benchmark.`,
+    `- Deterministic Attribution Score: ${confidenceScore.toFixed(2)}% (Exceeds statutory threshold of > 65.0% for immediate asset freeze).`,
+    `- Identified Modus Operandi: Rapid multi-hop sweep combined with asymmetric peeling chain to obfuscate stolen cryptocurrency.`,
+    `- Actionable Destination: Target VASP proxy address ${formatDisplayAddress(targetDeposit, 28)} represents a confirmed digital asset cash-out endpoint.`,
+  ];
+
+  const card3StartY = currentY;
+  let card3LinesCount = 0;
+  assessmentBullets.forEach((b) => {
+    card3LinesCount += doc.splitTextToSize(b, contentWidth - 8).length;
+  });
+  const card3H = 11 + card3LinesCount * (7.5 * 0.45) + assessmentBullets.length * 2;
+
   doc.setFillColor(240, 253, 244); // green-50
   doc.setDrawColor(34, 197, 94); // green-500
-  doc.roundedRect(margin, currentY, contentWidth, card3H, 2, 2, 'FD');
+  doc.roundedRect(margin, card3StartY, contentWidth, card3H, 2, 2, 'FD');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  currentY = card3StartY + 6;
   doc.setTextColor(22, 101, 52); // green-800
-  doc.text('EVIDENTIARY THRESHOLD & ACTIONABILITY ASSESSMENT', margin + 4, currentY + 6);
+  printWrapped('EVIDENTIARY THRESHOLD & ACTIONABILITY ASSESSMENT', margin + 4, contentWidth - 8, 8.5, true);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
   doc.setTextColor(30, 41, 59);
-  doc.text(
-    `- Quantified Loss & Valuation: ${totalVolume} ${chain} (${lossValuation.inrExact} / ~ ${lossValuation.inrShort}) via FIU-IND reference conversion benchmark.`,
-    margin + 4,
-    currentY + 11.5
-  );
-  doc.text(
-    `- Deterministic Attribution Score: ${confidenceScore.toFixed(2)}% (Exceeds statutory threshold of > 65.0% for immediate asset freeze).`,
-    margin + 4,
-    currentY + 16
-  );
-  doc.text(
-    `- Identified Modus Operandi: Rapid multi-hop sweep combined with asymmetric peeling chain to obfuscate stolen cryptocurrency.`,
-    margin + 4,
-    currentY + 20.5
-  );
-  doc.text(
-    `- Actionable Destination: Target VASP proxy address ${formatDisplayAddress(targetDeposit, 28)} represents a confirmed digital asset cash-out endpoint.`,
-    margin + 4,
-    currentY + 25
-  );
+  assessmentBullets.forEach((b) => {
+    printWrapped(b, margin + 4, contentWidth - 8, 7.5, false);
+  });
 
-  // Notice continuation indicator
-  currentY += card3H + 4;
+  currentY = card3StartY + card3H + 4;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
@@ -504,7 +511,7 @@ export function generateLegalDossierPDF(
   // PAGE 2: FORMAL STATUTORY SECTION 91 NOTICE & OFFICIAL SIGN-OFF BLOCK
   // =========================================================================
   doc.addPage();
-  currentY = 0;
+  currentY = 27;
 
   // Page 2 Header Banner
   doc.setFillColor(15, 23, 42);
@@ -533,8 +540,6 @@ export function generateLegalDossierPDF(
   doc.setFontSize(6.5);
   doc.text('WITHIN 48 HOURS', badge2X + 4, 14);
 
-  currentY = 27;
-
   // Formal Statutory Notice Card
   const wrappedRoot = formatDisplayAddress(rootAddress, 26);
   const wrappedTarget = formatDisplayAddress(targetDeposit, 28);
@@ -551,42 +556,44 @@ export function generateLegalDossierPDF(
     `5. PENAL WARNING FOR NON-COMPLIANCE: Take notice that failure to comply with this requisition within the stipulated 48 hours shall constitute intentional disobedience of a lawful order and suppression of legal evidence, attracting criminal prosecution under Section 175 and Section 204 of the Indian Penal Code (IPC) / corresponding provisions under the Bharatiya Nyaya Sanhita, 2023.`,
   ];
 
-  const noticeCardH = 155;
-  doc.setFillColor(254, 242, 242); // red-50
-  doc.setDrawColor(239, 68, 68); // red-500
-  doc.roundedRect(margin, currentY, contentWidth, noticeCardH, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(185, 28, 28); // red-700
-  doc.text('FORMAL STATUTORY REQUISITION & FREEZE ORDER', margin + 5, currentY + 6.5);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`TO: THE NODAL OFFICER / HEAD OF COMPLIANCE & LEGAL AFFAIRS,`, margin + 5, currentY + 13.5);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${vaspName} | Email: ${complianceEmail}`, margin + 5, currentY + 18);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text(`CASE REFERENCE DOCKET: ${caseId} | DATE: ${currentDate}`, margin + 5, currentY + 23.5);
-  doc.text(`SUBJECT: MANDATORY ASSET FREEZE, KYC DISCLOSURE, & LOG PRESERVATION`, margin + 5, currentY + 28);
-
-  let textY = currentY + 35;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(30, 41, 59);
-
-  // Safe inner text width = contentWidth - 14mm = 168mm (guarantees 7mm padding inside borders)
+  const noticeCardStartY = currentY;
   const innerTextWidth = contentWidth - 14;
 
+  let clausesTotalH = 0;
   statutoryNoticeClauses.forEach((clause) => {
     const lines = doc.splitTextToSize(clause, innerTextWidth);
-    doc.text(lines, margin + 7, textY);
-    textY += lines.length * 3.8 + 2;
+    clausesTotalH += lines.length * (7.5 * 0.45) + 2.5;
   });
 
-  currentY += noticeCardH + 5;
+  const headerSectionH = 38;
+  const noticeCardH = headerSectionH + clausesTotalH + 6;
+
+  doc.setFillColor(254, 242, 242); // red-50
+  doc.setDrawColor(239, 68, 68); // red-500
+  doc.roundedRect(margin, noticeCardStartY, contentWidth, noticeCardH, 2, 2, 'FD');
+
+  currentY = noticeCardStartY + 7;
+  doc.setTextColor(185, 28, 28); // red-700
+  printWrapped('FORMAL STATUTORY REQUISITION & FREEZE ORDER', margin + 6, contentWidth - 12, 9.5, true);
+
+  currentY += 0.5;
+  doc.setTextColor(15, 23, 42);
+  printWrapped('TO: THE NODAL OFFICER / HEAD OF COMPLIANCE & LEGAL AFFAIRS,', margin + 6, contentWidth - 12, 8, true);
+  currentY -= 0.5;
+  printWrapped(`${vaspName} | Email: ${complianceEmail}`, margin + 6, contentWidth - 12, 8, false);
+
+  currentY += 1;
+  printWrapped(`CASE REFERENCE DOCKET: ${caseId} | DATE: ${currentDate}`, margin + 6, contentWidth - 12, 8, true);
+  currentY -= 0.5;
+  printWrapped(`SUBJECT: MANDATORY ASSET FREEZE, KYC DISCLOSURE, & LOG PRESERVATION`, margin + 6, contentWidth - 12, 8, true);
+
+  currentY = noticeCardStartY + headerSectionH + 2;
+  doc.setTextColor(30, 41, 59);
+  statutoryNoticeClauses.forEach((clause) => {
+    printWrapped(clause, margin + 7, innerTextWidth, 7.5, false);
+  });
+
+  currentY = noticeCardStartY + noticeCardH + 5;
 
   // Signatory Authority & Certification Seal (Bottom of Page 2)
   const sigBoxH = 30;
@@ -594,18 +601,21 @@ export function generateLegalDossierPDF(
   doc.setDrawColor(203, 213, 225);
   doc.roundedRect(margin, currentY, contentWidth, sigBoxH, 2, 2, 'FD');
 
+  const sigStartY = currentY;
+  currentY = sigStartY + 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('BY ORDER OF INVESTIGATING AUTHORITY:', margin + 5, currentY + 6);
+  printWrapped('BY ORDER OF INVESTIGATING AUTHORITY:', margin + 5, contentWidth - 60, 8, true);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
   doc.setTextColor(71, 85, 105);
-  doc.text('Inspector of Police / Special Cyber Crime Investigation Wing', margin + 5, currentY + 11);
-  doc.text('State Cyber Police Station / MHA Cyber Desk, New Delhi', margin + 5, currentY + 15.5);
-  doc.text(`Digital Requisition Hash: SHA256-${caseId.slice(-8)}${Date.now().toString(16).toUpperCase()}`, margin + 5, currentY + 20);
-  doc.text(`Dispatch Telemetry: Transmitted electronically via FIU-IND Gateway Desk`, margin + 5, currentY + 24.5);
+  printWrapped('Inspector of Police / Special Cyber Crime Investigation Wing', margin + 5, contentWidth - 60, 7, false);
+  currentY -= 0.5;
+  printWrapped('State Cyber Police Station / MHA Cyber Desk, New Delhi', margin + 5, contentWidth - 60, 7, false);
+  currentY -= 0.5;
+  printWrapped(`Digital Requisition Hash: SHA256-${caseId.slice(-8)}${Date.now().toString(16).toUpperCase()}`, margin + 5, contentWidth - 60, 7, false);
+  currentY -= 0.5;
+  printWrapped(`Dispatch Telemetry: Transmitted electronically via FIU-IND Gateway Desk`, margin + 5, contentWidth - 60, 7, false);
 
   // Official Seal Stamp Graphic
   const sealW = 50;
@@ -613,16 +623,16 @@ export function generateLegalDossierPDF(
   const sealX = pageWidth - margin - sealW - 4;
   doc.setDrawColor(30, 64, 175);
   doc.setFillColor(239, 246, 255);
-  doc.roundedRect(sealX, currentY + 4, sealW, sealH, 2, 2, 'FD');
+  doc.roundedRect(sealX, sigStartY + 4, sealW, sealH, 2, 2, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(30, 64, 175);
-  doc.text('OFFICIALLY CERTIFIED', sealX + 5, currentY + 9.5);
+  doc.text('OFFICIALLY CERTIFIED', sealX + 5, sigStartY + 9.5);
   doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  doc.text('CYBER CRIME POLICE STATION', sealX + 5, currentY + 14);
-  doc.text(`DISPATCH: ${currentDate}`, sealX + 5, currentY + 18);
-  doc.text('MHA // FIU-IND ACCREDITED', sealX + 5, currentY + 22);
+  doc.text('CYBER CRIME POLICE STATION', sealX + 5, sigStartY + 14);
+  doc.text(`DISPATCH: ${currentDate}`, sealX + 5, sigStartY + 18);
+  doc.text('MHA // FIU-IND ACCREDITED', sealX + 5, sigStartY + 22);
 
   // Running Footers on both pages
   const totalPages = doc.getNumberOfPages();
