@@ -477,6 +477,13 @@ export function generateLegalDossierPDF(
     currentY = lastTable.finalY + 6;
   }
 
+  // 5. Multi-Page Synchronization:
+  // After drawing the table, check if currentY + 45 > pageHeight - margin. If so, trigger doc.addPage() and reset currentY = 16.
+  if (currentY + 45 > pageHeight - margin) {
+    doc.addPage();
+    currentY = 16;
+  }
+
   // 4. Evidentiary Standard Assessment Card on Page 1
   const assessmentBullets = [
     `- Quantified Loss & Valuation: ${totalVolume} ${chain} (${lossValuation.inrExact} / ~ ${lossValuation.inrShort}) via FIU-IND reference conversion benchmark.`,
@@ -548,29 +555,35 @@ export function generateLegalDossierPDF(
   const wrappedRoot = formatDisplayAddress(rootAddress, 26);
   const wrappedTarget = formatDisplayAddress(targetDeposit, 28);
 
-  const statutoryNoticeClauses = [
+  // Legal Paragraphs 1 through 5 with 1.5 line spacing
+  const legalParagraphs = [
     `1. PREAMBLE & JURISDICTION: Whereas an investigation into digital asset grand theft, cyber fraud, and money laundering is being conducted under the Indian Penal Code (IPC) / Bharatiya Nyaya Sanhita (BNS), 2023 read with the Prevention of Money Laundering Act (PMLA), 2002.`,
     `2. FORENSIC ATTRIBUTION FINDING: On-chain ledger telemetry has conclusively established that stolen cryptocurrency of ${totalVolume} ${chain} (Quantified Valuation: ${lossValuation.inrExact} / ~ ${lossValuation.inrShort}) originating from root suspect wallet [${wrappedRoot}] was layered through intermediary accounts and credited into your exchange infrastructure at deposit proxy address [${wrappedTarget}] with an attribution confidence of ${confidenceScore.toFixed(2)}%.`,
     `3. STATUTORY DIRECTIVE FOR IMMEDIATE ACCOUNT FREEZING: Under powers conferred by Section 91 of the Code of Criminal Procedure, 1973 (Cr.P.C.) / Section 94 of Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023, you are hereby ORDERED to immediately FREEZE all wallet balances, spot trading accounts, fiat withdrawal gateways, and collateral accounts associated with or linked to deposit address [${wrappedTarget}] up to the quantified proceeds value of ${lossValuation.inrExact} (${totalVolume} ${chain}).`,
-    `4. MANDATORY PRODUCTION OF RECORDS (48-HOUR TIMELINE): You are strictly directed to supply the following documents to the undersigned investigating authority within 48 HOURS of receipt:`,
-    `    (a) Full User KYC profile: Verified Aadhaar card, PAN card, photograph, residential address, verified mobile number, and registered email.`,
-    `    (b) Complete Financial Ledger: Historical deposits, withdrawals, order book trades, and internal transfer records from account opening to date.`,
-    `    (c) Fiat Settlement Audit: Beneficiary Indian bank account numbers, IFSC codes, and corresponding bank UTR reference numbers.`,
-    `    (d) Technical Access Telemetry: Full login and session audit logs including IPv4/IPv6 addresses, source ports, timestamps, and device fingerprints.`,
+    `4. MANDATORY PRODUCTION OF RECORDS (48-HOUR TIMELINE): You are strictly directed to supply the following documents to the undersigned investigating authority within 48 HOURS of receipt:\n    (a) Full User KYC profile: Verified Aadhaar card, PAN card, photograph, residential address, verified mobile number, and registered email.\n    (b) Complete Financial Ledger: Historical deposits, withdrawals, order book trades, and internal transfer records from account opening to date.\n    (c) Fiat Settlement Audit: Beneficiary Indian bank account numbers, IFSC codes, and corresponding bank UTR reference numbers.\n    (d) Technical Access Telemetry: Full login and session audit logs including IPv4/IPv6 addresses, source ports, timestamps, and device fingerprints.`,
     `5. PENAL WARNING FOR NON-COMPLIANCE: Take notice that failure to comply with this requisition within the stipulated 48 hours shall constitute intentional disobedience of a lawful order and suppression of legal evidence, attracting criminal prosecution under Section 175 and Section 204 of the Indian Penal Code (IPC) / corresponding provisions under the Bharatiya Nyaya Sanhita, 2023.`,
   ];
 
   const noticeCardStartY = currentY;
-  const innerTextWidth = contentWidth - 14;
+  const innerNoticeWidth = contentWidth - 12;
 
-  let clausesTotalH = 0;
-  statutoryNoticeClauses.forEach((clause) => {
-    const lines = doc.splitTextToSize(clause, innerTextWidth);
-    clausesTotalH += lines.length * (7.5 * 0.45) + 2.5;
+  // Set line height factor to 1.5 for formal legal document readability
+  doc.setLineHeightFactor(1.5);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+
+  // Exact 1.5 line height in mm for 7.5pt font: (7.5 * 1.5 / 72) * 25.4 = 3.96875 mm
+  const lineHeight15 = 3.97;
+  const paragraphSpacing = 3.0;
+
+  let paragraphsTotalH = 0;
+  legalParagraphs.forEach((pText) => {
+    const lines = doc.splitTextToSize(pText, innerNoticeWidth);
+    paragraphsTotalH += lines.length * lineHeight15 + paragraphSpacing;
   });
 
   const headerSectionH = 38;
-  const noticeCardH = headerSectionH + clausesTotalH + 6;
+  const noticeCardH = headerSectionH + paragraphsTotalH + 5;
 
   doc.setFillColor(254, 242, 242); // red-50
   doc.setDrawColor(239, 68, 68); // red-500
@@ -578,23 +591,29 @@ export function generateLegalDossierPDF(
 
   currentY = noticeCardStartY + 7;
   doc.setTextColor(185, 28, 28); // red-700
-  printWrapped('FORMAL STATUTORY REQUISITION & FREEZE ORDER', margin + 6, contentWidth - 12, 9.5, true);
+  printWrapped('FORMAL STATUTORY REQUISITION & FREEZE ORDER', margin + 6, innerNoticeWidth, 9.5, true);
 
   currentY += 0.5;
   doc.setTextColor(15, 23, 42);
-  printWrapped('TO: THE NODAL OFFICER / HEAD OF COMPLIANCE & LEGAL AFFAIRS,', margin + 6, contentWidth - 12, 8, true);
+  printWrapped('TO: THE NODAL OFFICER / HEAD OF COMPLIANCE & LEGAL AFFAIRS,', margin + 6, innerNoticeWidth, 8, true);
   currentY -= 0.5;
-  printWrapped(`${vaspName} | Email: ${complianceEmail}`, margin + 6, contentWidth - 12, 8, false);
+  printWrapped(`${vaspName} | Email: ${complianceEmail}`, margin + 6, innerNoticeWidth, 8, false);
 
   currentY += 1;
-  printWrapped(`CASE REFERENCE DOCKET: ${caseId} | DATE: ${currentDate}`, margin + 6, contentWidth - 12, 8, true);
+  printWrapped(`CASE REFERENCE DOCKET: ${caseId} | DATE: ${currentDate}`, margin + 6, innerNoticeWidth, 8, true);
   currentY -= 0.5;
-  printWrapped(`SUBJECT: MANDATORY ASSET FREEZE, KYC DISCLOSURE, & LOG PRESERVATION`, margin + 6, contentWidth - 12, 8, true);
+  printWrapped(`SUBJECT: MANDATORY ASSET FREEZE, KYC DISCLOSURE, & LOG PRESERVATION`, margin + 6, innerNoticeWidth, 8, true);
 
   currentY = noticeCardStartY + headerSectionH + 2;
   doc.setTextColor(30, 41, 59);
-  statutoryNoticeClauses.forEach((clause) => {
-    printWrapped(clause, margin + 7, innerTextWidth, 7.5, false);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setLineHeightFactor(1.5);
+
+  legalParagraphs.forEach((paragraphText) => {
+    const lines = doc.splitTextToSize(paragraphText, innerNoticeWidth);
+    doc.text(lines, margin + 6, currentY);
+    currentY += lines.length * lineHeight15 + paragraphSpacing;
   });
 
   currentY = noticeCardStartY + noticeCardH + 5;
