@@ -115,7 +115,8 @@ function formatTableTxHash(tx: string): string {
 }
 
 /**
- * PDF-safe currency formatters to prevent jsPDF standard font character-set glyph glitches (₹ -> ¹, ≈ -> "H).
+ * Strict ASCII-only currency formatters.
+ * Prohibits unicode glyphs (no ₹, no ≈, no →) to prevent standard font glyph corruption.
  */
 function formatPdfINR(amount: number, chain: string = 'ETH'): string {
   if (amount === undefined || amount === null || isNaN(amount)) return 'INR 0';
@@ -144,7 +145,7 @@ function formatPdfFullLoss(cryptoAmount: number, chain: string = 'ETH') {
 
 /**
  * Generates an official, publication-grade Section 91 CrPC / Section 94 BNSS
- * Legal Evidence Dossier PDF with precise alignments, clean typography, and zero text overflow.
+ * Legal Evidence Dossier PDF with strict dynamic geometry, clean typography, and zero overflow.
  */
 export function generateLegalDossierPDF(
   caseData: CaseDossierData | null,
@@ -156,10 +157,13 @@ export function generateLegalDossierPDF(
     format: 'a4',
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 14;
-  const contentWidth = pageWidth - 2 * margin; // 182mm
+  const pageWidth = doc.internal.pageSize.getWidth();   // 210mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+  const margin = 14;                                   // 14mm
+  const contentWidth = pageWidth - (margin * 2);        // 182mm
+
+  // Dynamic vertical tracking cursor
+  let currentY = 0;
 
   // Resolve metadata values
   const caseId =
@@ -220,7 +224,7 @@ export function generateLegalDossierPDF(
   // PAGE 1: FORENSIC INVESTIGATION BRIEF & MULTI-HOP ON-CHAIN AUDIT TRAIL
   // =========================================================================
 
-  // Top National Header Banner
+  // Top National Header Banner (0 to 24mm)
   doc.setFillColor(15, 23, 42); // slate-900
   doc.rect(0, 0, pageWidth, 24, 'F');
 
@@ -232,7 +236,7 @@ export function generateLegalDossierPDF(
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11.5);
-  doc.text('GOVERNMENT OF INDIA — MINISTRY OF HOME AFFAIRS', margin, 10);
+  doc.text('GOVERNMENT OF INDIA -- MINISTRY OF HOME AFFAIRS', margin, 10);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
@@ -252,128 +256,126 @@ export function generateLegalDossierPDF(
   doc.setFontSize(6.5);
   doc.text('RULE 91 CrPC / BNSS SEC 94', badgeX + 4, 15);
 
-  let y = 30;
+  currentY = 29;
 
   // 1. Case Docket Identification Card (Structured 4-Row Grid with zero overflow)
   const card1H = 30;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(margin, y, contentWidth, card1H, 2, 2, 'FD');
+  doc.roundedRect(margin, currentY, contentWidth, card1H, 2, 2, 'FD');
 
   doc.setTextColor(15, 23, 42);
 
   // Row 1: Case Docket ID & Date of Dispatch
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('Case Docket ID:', margin + 4, y + 6);
+  doc.text('Case Docket ID:', margin + 4, currentY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(caseId, margin + 30, y + 6);
+  doc.text(caseId, margin + 30, currentY + 6);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Date of Dispatch:', margin + 96, y + 6);
+  doc.text('Date of Dispatch:', margin + 100, currentY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${currentDate} (${currentTimestamp})`, margin + 124, y + 6);
+  doc.text(`${currentDate} (${currentTimestamp})`, margin + 128, currentY + 6);
 
-  // Row 2: Subject Matter & Loss Claim
+  // Row 2: Subject Matter & Loss Claim (Distinct non-overlapping columns)
   doc.setFont('helvetica', 'bold');
-  doc.text('Subject Matter:', margin + 4, y + 12.5);
+  doc.text('Subject Matter:', margin + 4, currentY + 12.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(
-    `Statutory Requisition & Asset Freeze (${totalVolume} ${chain})`,
-    margin + 30,
-    y + 12.5
-  );
+  doc.text(`Statutory Asset Freeze (${totalVolume} ${chain})`, margin + 30, currentY + 12.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Loss Valuation:', margin + 100, y + 12.5);
+  doc.text('Loss Valuation:', margin + 100, currentY + 12.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(185, 28, 28);
-  doc.text(`${lossValuation.inrExact} (~ ${lossValuation.inrShort})`, margin + 124, y + 12.5);
+  doc.text(`${lossValuation.inrExact} (~ ${lossValuation.inrShort})`, margin + 128, currentY + 12.5);
 
-  // Row 3: Target Suspect Origin (Full width available — no overflow)
+  // Row 3: Target Suspect Origin (Full width available -- no overflow)
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.text('Suspect Origin:', margin + 4, y + 19);
+  doc.text('Suspect Origin:', margin + 4, currentY + 19);
   doc.setFont('courier', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(30, 41, 59);
-  doc.text(rootAddress, margin + 30, y + 19);
+  doc.text(rootAddress, margin + 30, currentY + 19);
 
   // Row 4: Statutory Powers
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('Statutory Powers:', margin + 4, y + 25.5);
+  doc.text('Statutory Powers:', margin + 4, currentY + 25.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(185, 28, 28);
   doc.text(
     'Section 91 Cr.P.C. / Section 94 Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023',
     margin + 30,
-    y + 25.5
+    currentY + 25.5
   );
 
-  y += card1H + 5;
+  currentY += card1H + 5;
 
   // 2. Identified Target Reporting Entity (VASP) Card
   const card2H = 34;
   doc.setFillColor(241, 245, 249);
   doc.setDrawColor(148, 163, 184);
-  doc.roundedRect(margin, y, contentWidth, card2H, 2, 2, 'FD');
+  doc.roundedRect(margin, currentY, contentWidth, card2H, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
-  doc.text('IDENTIFIED TARGET REPORTING ENTITY (VASP PROFILE)', margin + 4, y + 6);
+  doc.text('IDENTIFIED TARGET REPORTING ENTITY (VASP PROFILE)', margin + 4, currentY + 6);
 
   // Col 1: Entity Name | Col 2: Jurisdiction
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('Entity Name:', margin + 4, y + 13);
+  doc.text('Entity Name:', margin + 4, currentY + 13);
   doc.setFont('helvetica', 'normal');
-  doc.text(vaspName, margin + 25, y + 13);
+  doc.text(vaspName, margin + 25, currentY + 13);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Jurisdiction:', margin + 96, y + 13);
+  doc.text('Jurisdiction:', margin + 98, currentY + 13);
   doc.setFont('helvetica', 'normal');
-  doc.text('India (Registered FIU-IND Reporting Entity)', margin + 118, y + 13);
+  doc.text('India (Registered FIU-IND Reporting Entity)', margin + 120, currentY + 13);
 
   // Col 1: Target Deposit Proxy | Col 2: Compliance Email
   doc.setFont('helvetica', 'bold');
-  doc.text('Deposit Proxy:', margin + 4, y + 20);
+  doc.text('Deposit Proxy:', margin + 4, currentY + 20);
   doc.setFont('courier', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(14, 116, 144);
-  doc.text(formatDisplayAddress(targetDeposit, 28), margin + 25, y + 20);
+  doc.text(formatDisplayAddress(targetDeposit, 28), margin + 25, currentY + 20);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('Compliance Email:', margin + 96, y + 20);
+  doc.text('Compliance Email:', margin + 98, currentY + 20);
   doc.setFont('helvetica', 'normal');
-  doc.text(complianceEmail, margin + 125, y + 20);
+  doc.text(complianceEmail, margin + 127, currentY + 20);
 
   // Col 1: Attribution Confidence | Col 2: Preserved Value & Decay
   doc.setFont('helvetica', 'bold');
-  doc.text('Attribution Score:', margin + 4, y + 27);
+  doc.text('Attribution Score:', margin + 4, currentY + 27);
   doc.setTextColor(22, 101, 52); // green-800
-  doc.text(`${confidenceScore.toFixed(2)}% [EVIDENTIARY STANDARD EXCEEDED]`, margin + 30, y + 27);
+  doc.text(`${confidenceScore.toFixed(2)}% [EVIDENTIARY STANDARD EXCEEDED]`, margin + 30, currentY + 27);
 
   doc.setTextColor(71, 85, 105);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.text(
-    `Decay: ${hopDecay}  •  Preserved: ${valuePreserved}  •  Loss: ${lossValuation.inrShort}`,
-    margin + 96,
-    y + 27
+    `Decay: ${hopDecay}  *  Preserved: ${valuePreserved}  *  Loss: ${lossValuation.inrShort}`,
+    margin + 98,
+    currentY + 27
   );
 
-  y += card2H + 6;
+  currentY += card2H + 6;
 
   // 3. Forensic Multi-Hop Audit Trail Table Header
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
-  doc.text('FORENSIC MULTI-HOP ON-CHAIN AUDIT TRAIL', margin, y);
+  doc.text('FORENSIC MULTI-HOP ON-CHAIN AUDIT TRAIL', margin, currentY);
+
+  currentY += 2.5;
 
   // Build clean, single-line formatted table rows with zero dangling characters
   let tableRows: string[][] = [];
@@ -420,7 +422,7 @@ export function generateLegalDossierPDF(
   // Exact column sizing totaling exactly 182mm (contentWidth)
   // 10 + 36 + 36 + 28 + 24 + 48 = 182mm
   autoTable(doc, {
-    startY: y + 2.5,
+    startY: currentY,
     head: [['Hop', 'Origin Address', 'Destination Address', 'Amount Traced', 'Tx Hash', 'Forensic Typology / Role']],
     body: tableRows,
     theme: 'grid',
@@ -453,56 +455,56 @@ export function generateLegalDossierPDF(
     margin: { left: margin, right: margin },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lastTable = (doc as any).lastAutoTable;
-  y = lastTable ? lastTable.finalY + 5 : y + 60;
+  currentY = lastTable ? lastTable.finalY + 5 : currentY + 55;
 
   // 4. Evidentiary Standard Assessment Card on Page 1
   const card3H = 28;
   doc.setFillColor(240, 253, 244); // green-50
   doc.setDrawColor(34, 197, 94); // green-500
-  doc.roundedRect(margin, y, contentWidth, card3H, 2, 2, 'FD');
+  doc.roundedRect(margin, currentY, contentWidth, card3H, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(22, 101, 52); // green-800
-  doc.text('EVIDENTIARY THRESHOLD & ACTIONABILITY ASSESSMENT', margin + 4, y + 6);
+  doc.text('EVIDENTIARY THRESHOLD & ACTIONABILITY ASSESSMENT', margin + 4, currentY + 6);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(30, 41, 59);
   doc.text(
-    `• Quantified Loss & Valuation: ${totalVolume} ${chain} (${lossValuation.inrExact} / ~ ${lossValuation.inrShort}) via FIU-IND reference conversion benchmark.`,
+    `- Quantified Loss & Valuation: ${totalVolume} ${chain} (${lossValuation.inrExact} / ~ ${lossValuation.inrShort}) via FIU-IND reference conversion benchmark.`,
     margin + 4,
-    y + 11.5
+    currentY + 11.5
   );
   doc.text(
-    `• Deterministic Attribution Score: ${confidenceScore.toFixed(2)}% (Exceeds statutory threshold of > 65.0% for immediate asset freeze).`,
+    `- Deterministic Attribution Score: ${confidenceScore.toFixed(2)}% (Exceeds statutory threshold of > 65.0% for immediate asset freeze).`,
     margin + 4,
-    y + 16
+    currentY + 16
   );
   doc.text(
-    `• Identified Modus Operandi: Rapid multi-hop sweep combined with asymmetric peeling chain to obfuscate stolen cryptocurrency.`,
+    `- Identified Modus Operandi: Rapid multi-hop sweep combined with asymmetric peeling chain to obfuscate stolen cryptocurrency.`,
     margin + 4,
-    y + 20.5
+    currentY + 20.5
   );
   doc.text(
-    `• Actionable Destination: Target VASP proxy address ${formatDisplayAddress(targetDeposit, 28)} represents a confirmed digital asset cash-out endpoint.`,
+    `- Actionable Destination: Target VASP proxy address ${formatDisplayAddress(targetDeposit, 28)} represents a confirmed digital asset cash-out endpoint.`,
     margin + 4,
-    y + 25
+    currentY + 25
   );
 
   // Notice continuation indicator
-  y += card3H + 4;
+  currentY += card3H + 4;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('Official Section 91 Cr.P.C. / Section 94 BNSS Statutory Notice detailed on Page 2 >>', margin, y);
+  doc.text('Official Section 91 Cr.P.C. / Section 94 BNSS Statutory Notice detailed on Page 2 >>', margin, currentY);
 
   // =========================================================================
   // PAGE 2: FORMAL STATUTORY SECTION 91 NOTICE & OFFICIAL SIGN-OFF BLOCK
   // =========================================================================
   doc.addPage();
+  currentY = 0;
 
   // Page 2 Header Banner
   doc.setFillColor(15, 23, 42);
@@ -513,7 +515,7 @@ export function generateLegalDossierPDF(
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text('GOVERNMENT OF INDIA — MINISTRY OF HOME AFFAIRS', margin, 10);
+  doc.text('GOVERNMENT OF INDIA -- MINISTRY OF HOME AFFAIRS', margin, 10);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(203, 213, 225);
@@ -531,31 +533,9 @@ export function generateLegalDossierPDF(
   doc.setFontSize(6.5);
   doc.text('WITHIN 48 HOURS', badge2X + 4, 14);
 
-  let p2Y = 27;
+  currentY = 27;
 
   // Formal Statutory Notice Card
-  const noticeCardH = 155;
-  doc.setFillColor(254, 242, 242); // red-50
-  doc.setDrawColor(239, 68, 68); // red-500
-  doc.roundedRect(margin, p2Y, contentWidth, noticeCardH, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(185, 28, 28); // red-700
-  doc.text('FORMAL STATUTORY REQUISITION & FREEZE ORDER', margin + 5, p2Y + 6.5);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`TO: THE NODAL OFFICER / HEAD OF COMPLIANCE & LEGAL AFFAIRS,`, margin + 5, p2Y + 13.5);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${vaspName} | Email: ${complianceEmail}`, margin + 5, p2Y + 18);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text(`CASE REFERENCE DOCKET: ${caseId} | DATE: ${currentDate}`, margin + 5, p2Y + 23.5);
-  doc.text(`SUBJECT: MANDATORY ASSET FREEZE, KYC DISCLOSURE, & LOG PRESERVATION`, margin + 5, p2Y + 28);
-
-  // Recitals & Statutory Directives (word wrapped with safe text width to avoid borders)
   const wrappedRoot = formatDisplayAddress(rootAddress, 26);
   const wrappedTarget = formatDisplayAddress(targetDeposit, 28);
 
@@ -571,7 +551,28 @@ export function generateLegalDossierPDF(
     `5. PENAL WARNING FOR NON-COMPLIANCE: Take notice that failure to comply with this requisition within the stipulated 48 hours shall constitute intentional disobedience of a lawful order and suppression of legal evidence, attracting criminal prosecution under Section 175 and Section 204 of the Indian Penal Code (IPC) / corresponding provisions under the Bharatiya Nyaya Sanhita, 2023.`,
   ];
 
-  let textY = p2Y + 35;
+  const noticeCardH = 155;
+  doc.setFillColor(254, 242, 242); // red-50
+  doc.setDrawColor(239, 68, 68); // red-500
+  doc.roundedRect(margin, currentY, contentWidth, noticeCardH, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(185, 28, 28); // red-700
+  doc.text('FORMAL STATUTORY REQUISITION & FREEZE ORDER', margin + 5, currentY + 6.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`TO: THE NODAL OFFICER / HEAD OF COMPLIANCE & LEGAL AFFAIRS,`, margin + 5, currentY + 13.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${vaspName} | Email: ${complianceEmail}`, margin + 5, currentY + 18);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`CASE REFERENCE DOCKET: ${caseId} | DATE: ${currentDate}`, margin + 5, currentY + 23.5);
+  doc.text(`SUBJECT: MANDATORY ASSET FREEZE, KYC DISCLOSURE, & LOG PRESERVATION`, margin + 5, currentY + 28);
+
+  let textY = currentY + 35;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(30, 41, 59);
@@ -585,26 +586,26 @@ export function generateLegalDossierPDF(
     textY += lines.length * 3.8 + 2;
   });
 
-  // Signatory Authority & Certification Seal (Bottom of Page 2)
-  const sigBoxY = p2Y + noticeCardH + 5;
-  const sigBoxH = 30;
+  currentY += noticeCardH + 5;
 
+  // Signatory Authority & Certification Seal (Bottom of Page 2)
+  const sigBoxH = 30;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(margin, sigBoxY, contentWidth, sigBoxH, 2, 2, 'FD');
+  doc.roundedRect(margin, currentY, contentWidth, sigBoxH, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('BY ORDER OF INVESTIGATING AUTHORITY:', margin + 5, sigBoxY + 6);
+  doc.text('BY ORDER OF INVESTIGATING AUTHORITY:', margin + 5, currentY + 6);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(71, 85, 105);
-  doc.text('Inspector of Police / Special Cyber Crime Investigation Wing', margin + 5, sigBoxY + 11);
-  doc.text('State Cyber Police Station / MHA Cyber Desk, New Delhi', margin + 5, sigBoxY + 15.5);
-  doc.text(`Digital Requisition Hash: SHA256-${caseId.slice(-8)}${Date.now().toString(16).toUpperCase()}`, margin + 5, sigBoxY + 20);
-  doc.text(`Dispatch Telemetry: Transmitted electronically via FIU-IND Gateway Desk`, margin + 5, sigBoxY + 24.5);
+  doc.text('Inspector of Police / Special Cyber Crime Investigation Wing', margin + 5, currentY + 11);
+  doc.text('State Cyber Police Station / MHA Cyber Desk, New Delhi', margin + 5, currentY + 15.5);
+  doc.text(`Digital Requisition Hash: SHA256-${caseId.slice(-8)}${Date.now().toString(16).toUpperCase()}`, margin + 5, currentY + 20);
+  doc.text(`Dispatch Telemetry: Transmitted electronically via FIU-IND Gateway Desk`, margin + 5, currentY + 24.5);
 
   // Official Seal Stamp Graphic
   const sealW = 50;
@@ -612,18 +613,18 @@ export function generateLegalDossierPDF(
   const sealX = pageWidth - margin - sealW - 4;
   doc.setDrawColor(30, 64, 175);
   doc.setFillColor(239, 246, 255);
-  doc.roundedRect(sealX, sigBoxY + 4, sealW, sealH, 2, 2, 'FD');
+  doc.roundedRect(sealX, currentY + 4, sealW, sealH, 2, 2, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(30, 64, 175);
-  doc.text('OFFICIALLY CERTIFIED', sealX + 5, sigBoxY + 9.5);
+  doc.text('OFFICIALLY CERTIFIED', sealX + 5, currentY + 9.5);
   doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  doc.text('CYBER CRIME POLICE STATION', sealX + 5, sigBoxY + 14);
-  doc.text(`DISPATCH: ${currentDate}`, sealX + 5, sigBoxY + 18);
-  doc.text('MHA // FIU-IND ACCREDITED', sealX + 5, sigBoxY + 22);
+  doc.text('CYBER CRIME POLICE STATION', sealX + 5, currentY + 14);
+  doc.text(`DISPATCH: ${currentDate}`, sealX + 5, currentY + 18);
+  doc.text('MHA // FIU-IND ACCREDITED', sealX + 5, currentY + 22);
 
-  // Footers on both pages
+  // Running Footers on both pages
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -633,14 +634,14 @@ export function generateLegalDossierPDF(
     doc.setFontSize(6.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Confidential Cyber Intelligence Report — Case: ${caseId} — Page ${i} of ${totalPages}`,
+      `Confidential Cyber Intelligence Report -- Case: ${caseId} -- Page ${i} of ${totalPages}`,
       margin,
       pageHeight - 4
     );
     doc.text('FIU-IND / MHA VASP FORENSIC DESK', pageWidth - margin - 48, pageHeight - 4);
   }
 
-  // Trigger browser download
+  // Trigger download / file write
   const safeAddress = rootAddress.replace(/[^a-zA-Z0-9_-]/g, '_');
   const filename = `Case_Dossier_${safeAddress}.pdf`;
   doc.save(filename);
