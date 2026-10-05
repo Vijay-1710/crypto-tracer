@@ -1,6 +1,12 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import jsPDFConstructor, { jsPDF as jsPDFNamed } from 'jspdf';
+import autoTableFn from 'jspdf-autotable';
 import { CRYPTO_INR_RATES } from './currencyUtils';
+
+// Universal constructor resolution for both Vite ESM bundling and Node.js execution
+// @ts-ignore
+const jsPDF = typeof jsPDFNamed === 'function' ? jsPDFNamed : (typeof jsPDFConstructor === 'function' ? jsPDFConstructor : (jsPDFConstructor as any)?.default);
+// @ts-ignore
+const autoTable = typeof autoTableFn === 'function' ? autoTableFn : ((autoTableFn as any)?.default || autoTableFn);
 
 export interface ForensicHop {
   step_number: number;
@@ -273,16 +279,16 @@ export function generateLegalDossierPDF(
   doc.text('Subject Matter:', margin + 4, y + 12.5);
   doc.setFont('helvetica', 'normal');
   doc.text(
-    `Statutory Requisition & Asset Freeze (${totalVolume} ${chain} / ${lossValuation.inrShort})`,
+    `Statutory Requisition & Asset Freeze (${totalVolume} ${chain})`,
     margin + 30,
     y + 12.5
   );
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Valuation (INR):', margin + 96, y + 12.5);
+  doc.text('Loss Valuation:', margin + 100, y + 12.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(185, 28, 28);
-  doc.text(lossValuation.inrExact, margin + 124, y + 12.5);
+  doc.text(`${lossValuation.inrExact} (~ ${lossValuation.inrShort})`, margin + 124, y + 12.5);
 
   // Row 3: Target Suspect Origin (Full width available — no overflow)
   doc.setTextColor(15, 23, 42);
@@ -356,7 +362,7 @@ export function generateLegalDossierPDF(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.text(
-    `Decay: ${hopDecay}  |  Preserved: ${valuePreserved}  |  Loss: ${totalVolume} ${chain} (~ ${lossValuation.inrShort})`,
+    `Decay: ${hopDecay}  •  Preserved: ${valuePreserved}  •  Loss: ${lossValuation.inrShort}`,
     margin + 96,
     y + 27
   );
@@ -528,7 +534,7 @@ export function generateLegalDossierPDF(
   let p2Y = 27;
 
   // Formal Statutory Notice Card
-  const noticeCardH = 168;
+  const noticeCardH = 155;
   doc.setFillColor(254, 242, 242); // red-50
   doc.setDrawColor(239, 68, 68); // red-500
   doc.roundedRect(margin, p2Y, contentWidth, noticeCardH, 2, 2, 'FD');
