@@ -437,41 +437,45 @@ export function generateLegalDossierPDF(
   // Exact column sizing totaling exactly 182mm (contentWidth)
   // 10 + 36 + 36 + 28 + 24 + 48 = 182mm
   autoTable(doc, {
-    startY: currentY,
+    startY: currentY + 4,
+    margin: { left: margin, right: margin },
+    tableWidth: contentWidth,
     head: [['Hop', 'Origin Address', 'Destination Address', 'Amount Traced', 'Tx Hash', 'Forensic Typology / Role']],
     body: tableRows,
     theme: 'grid',
     headStyles: {
       fillColor: [15, 23, 42],
       textColor: [255, 255, 255],
-      fontSize: 7.5,
+      fontSize: 8,
       fontStyle: 'bold',
       halign: 'left',
-      cellPadding: 2.5,
     },
     bodyStyles: {
-      fontSize: 7,
-      font: 'helvetica',
+      fontSize: 7.5,
+      cellPadding: 2.5,
       textColor: [30, 41, 59],
-      cellPadding: 2.2,
       valign: 'middle',
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
     columnStyles: {
-      0: { cellWidth: 10, fontStyle: 'bold', halign: 'center' },
-      1: { cellWidth: 36, fontStyle: 'normal' },
-      2: { cellWidth: 36, fontStyle: 'normal' },
-      3: { cellWidth: 28, fontStyle: 'bold', halign: 'right' },
-      4: { cellWidth: 24, fontStyle: 'normal' },
-      5: { cellWidth: 48, fontStyle: 'normal' },
+      0: { cellWidth: 10, halign: 'center' },       // Hop #
+      1: { cellWidth: 42, overflow: 'ellipsize' },   // Origin
+      2: { cellWidth: 42, overflow: 'ellipsize' },   // Destination
+      3: { cellWidth: 32 },                         // Amount & Value
+      4: { cellWidth: 26, overflow: 'ellipsize' },   // Tx Hash
+      5: { cellWidth: 'auto' },                     // Forensic Typology / Role
     },
-    margin: { left: margin, right: margin },
+    didDrawPage: (data: any) => {
+      currentY = data.cursor.y + 6; // Dynamically set currentY to the end of the table
+    },
   });
 
   const lastTable = (doc as any).lastAutoTable;
-  currentY = lastTable ? lastTable.finalY + 5 : currentY + 55;
+  if (lastTable?.finalY && (!currentY || currentY < lastTable.finalY)) {
+    currentY = lastTable.finalY + 6;
+  }
 
   // 4. Evidentiary Standard Assessment Card on Page 1
   const assessmentBullets = [
